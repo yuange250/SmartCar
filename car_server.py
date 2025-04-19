@@ -4,6 +4,12 @@ import socket
 import json
 import threading
 import time
+import cv2
+import numpy as np
+import struct
+import io
+import base64
+from PIL import Image
 
 # 设置GPIO模式为BCM
 GPIO.setmode(GPIO.BCM)
@@ -15,20 +21,137 @@ IN2 = 25  # 控制端2
 IN3 = 11  # 控制端3
 IN4 = 8  # 控制端4
 
+# 定义舵机GPIO引脚
+SERVO_H = 15  # 水平舵机
+SERVO_V = 18  # 垂直舵机
+
 # 设置GPIO为输出模式
 GPIO.setup(IN1, GPIO.OUT)
 GPIO.setup(IN2, GPIO.OUT)
 GPIO.setup(IN3, GPIO.OUT)
 GPIO.setup(IN4, GPIO.OUT)
 
+# 设置舵机GPIO为输出模式
+GPIO.setup(SERVO_H, GPIO.OUT)
+GPIO.setup(SERVO_V, GPIO.OUT)
+
+# 创建PWM对象，频率为50Hz
+pwm_h = GPIO.PWM(SERVO_H, 50)
+pwm_v = GPIO.PWM(SERVO_V, 50)
+
+# 启动PWM
+pwm_h.start(0)
+pwm_v.start(0)
+
 # 当前速度（0-100）
 current_speed = 50
+
+# 当前舵机角度
+current_h_angle = 90  # 水平角度，默认90度（中间位置）
+current_v_angle = 90  # 垂直角度，默认90度（中间位置）
+
+# 摄像头设置
+camera = None
+camera_lock = threading.Lock()
+camera_running = False
+camera_thread = None
+
+def init_camera():
+    """初始化摄像头"""
+    global camera
+    try:
+        camera = cv2.VideoCapture(0)  # 使用默认摄像头
+        if not camera.isOpened():
+            print("无法打开摄像头")
+            return False
+        # 设置分辨率
+        camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        return True
+    except Exception as e:
+        print(f"初始化摄像头失败: {e}")
+        return False
+
+def release_camera():
+    """释放摄像头"""
+    global camera
+    if camera:
+        camera.release()
+        camera = None
+
+def get_frame():
+    """获取一帧图像并压缩"""
+    global camera
+    if not camera:
+        return None
+    
+    with camera_lock:
+        ret, frame = camera.read()
+        if not ret:
+            return None
+        
+        # 压缩图像
+        _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+        return buffer.tobytes()
+
+def camera_stream_thread(client_socket):
+    """摄像头流线程"""
+    global camera_running
+    try:
+        while camera_running:
+            frame_data = get_frame()
+            if frame_data:
+                # 发送帧大小和帧数据
+                size = len(frame_data)
+                client_socket.send(struct.pack('>L', size))
+                client_socket.send(frame_data)
+            time.sleep(0.05)  # 约20fps
+    except Exception as e:
+        print(f"摄像头流错误: {e}")
+    finally:
+        camera_running = False
+
+def start_camera_stream(client_socket):
+    """启动摄像头流"""
+    global camera_running, camera_thread
+    if not camera_running:
+        camera_running = True
+        camera_thread = threading.Thread(target=camera_stream_thread, args=(client_socket,))
+        camera_thread.daemon = True
+        camera_thread.start()
+
+def stop_camera_stream():
+    """停止摄像头流"""
+    global camera_running
+    camera_running = False
+    if camera_thread:
+        camera_thread.join(timeout=1.0)
 
 def set_speed(speed):
     """设置速度（0-100）"""
     global current_speed
     current_speed = max(0, min(100, speed))
     return f"速度已设置为: {current_speed}%"
+
+def angle_to_duty_cycle(angle):
+    """将角度转换为占空比"""
+    return 2.5 + (angle / 180.0) * 10.0
+
+def set_servo_h(angle):
+    """设置水平舵机角度"""
+    global current_h_angle
+    current_h_angle = max(0, min(180, angle))
+    duty_cycle = angle_to_duty_cycle(current_h_angle)
+    pwm_h.ChangeDutyCycle(duty_cycle)
+    return f"水平角度已设置为: {current_h_angle}度"
+
+def set_servo_v(angle):
+    """设置垂直舵机角度"""
+    global current_v_angle
+    current_v_angle = max(0, min(180, angle))
+    duty_cycle = angle_to_duty_cycle(current_v_angle)
+    pwm_v.ChangeDutyCycle(duty_cycle)
+    return f"垂直角度已设置为: {current_v_angle}度"
 
 def forward():
     """小车前进"""
@@ -86,10 +209,6 @@ def stop():
     GPIO.output(IN4, GPIO.LOW)
     return "停止"
 
-def cleanup():
-    """清理GPIO设置"""
-    GPIO.cleanup()
-
 def handle_client(client_socket, addr):
     """处理客户端连接"""
     print(f"客户端 {addr} 已连接")
@@ -120,6 +239,22 @@ def handle_client(client_socket, addr):
                 elif action == 'speed':
                     speed = command.get('value', 50)
                     response = set_speed(speed)
+                elif action == 'servo_h':
+                    angle = command.get('value', 90)
+                    response = set_servo_h(angle)
+                elif action == 'servo_v':
+                    angle = command.get('value', 90)
+                    response = set_servo_v(angle)
+                elif action == 'start_camera':
+                    if init_camera():
+                        start_camera_stream(client_socket)
+                        response = "摄像头已启动"
+                    else:
+                        response = "摄像头启动失败"
+                elif action == 'stop_camera':
+                    stop_camera_stream()
+                    release_camera()
+                    response = "摄像头已停止"
                 elif action == 'ping':
                     response = "pong"
                 else:
@@ -129,7 +264,9 @@ def handle_client(client_socket, addr):
                 client_socket.send(json.dumps({
                     'status': 'success',
                     'message': response,
-                    'current_speed': current_speed
+                    'current_speed': current_speed,
+                    'current_h_angle': current_h_angle,
+                    'current_v_angle': current_v_angle
                 }).encode('utf-8'))
 
             except json.JSONDecodeError:
@@ -141,6 +278,8 @@ def handle_client(client_socket, addr):
     except Exception as e:
         print(f"处理客户端 {addr} 时发生错误: {e}")
     finally:
+        stop_camera_stream()
+        release_camera()
         client_socket.close()
         print(f"客户端 {addr} 已断开连接")
 
