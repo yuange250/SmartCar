@@ -364,7 +364,6 @@ class CarClientGUI:
 
     def receive_video(self):
         """接收视频流"""
-        self.log(f"接受视频流")
         while self.camera_running:
             self.log(f"接受到图像")
             try:
@@ -444,7 +443,7 @@ class CarClientGUI:
                     # 转换为PhotoImage
                     image = Image.fromarray(frame)
                     photo = ImageTk.PhotoImage(image=image)
-                    
+                                        
                     # 使用after方法在主线程中更新UI
                     self.root.after(0, lambda p=photo: self.update_video_frame(p))
                     
@@ -469,6 +468,7 @@ class CarClientGUI:
         if self.camera_running:
             self.video_label.configure(image=photo)
             self.video_label.image = photo  # 保持引用
+            self.log(f"完成显示")
 
     def log(self, message):
         """添加日志"""
