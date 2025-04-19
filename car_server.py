@@ -16,10 +16,12 @@ GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
 
 # 定义GPIO引脚
-IN1 = 9  # 控制端1
+IN1 = 9   # 控制端1
 IN2 = 25  # 控制端2
 IN3 = 11  # 控制端3
-IN4 = 8  # 控制端4
+IN4 = 8   # 控制端4
+ENA = 10  # 电机A使能端
+ENB = 17  # 电机B使能端
 
 # 定义舵机GPIO引脚
 SERVO_H = 15  # 水平舵机
@@ -30,46 +32,49 @@ GPIO.setup(IN1, GPIO.OUT)
 GPIO.setup(IN2, GPIO.OUT)
 GPIO.setup(IN3, GPIO.OUT)
 GPIO.setup(IN4, GPIO.OUT)
+GPIO.setup(ENA, GPIO.OUT)
+GPIO.setup(ENB, GPIO.OUT)
 
 # 设置舵机GPIO为输出模式
 GPIO.setup(SERVO_H, GPIO.OUT)
 GPIO.setup(SERVO_V, GPIO.OUT)
 
-# 创建PWM对象，频率为50Hz
+# 创建PWM对象
+pwm_a = GPIO.PWM(ENA, 100)  # 频率100Hz
+pwm_b = GPIO.PWM(ENB, 100)  # 频率100Hz
 pwm_h = GPIO.PWM(SERVO_H, 50)
 pwm_v = GPIO.PWM(SERVO_V, 50)
 
 # 启动PWM
+pwm_a.start(0)
+pwm_b.start(0)
 pwm_h.start(0)
 pwm_v.start(0)
 
-# 当前速度（0-100）
+# 全局变量
 current_speed = 50
-
-# 当前舵机角度
-current_h_angle = 90  # 水平角度，默认90度（中间位置）
-current_v_angle = 90  # 垂直角度，默认90度（中间位置）
-
-# 摄像头设置
-camera = None
-camera_lock = threading.Lock()
-camera_running = False
-camera_thread = None
+current_h_angle = 90
+current_v_angle = 90
+camera = None  # 添加全局camera变量
+camera_lock = threading.Lock()  # 添加摄像头锁
+camera_running = False  # 添加摄像头运行状态标志
+camera_thread = None  # 添加摄像头线程变量
 
 def init_camera():
     """初始化摄像头"""
     global camera
     try:
-        if camera is not None:
-            camera.release()
-        camera = cv2.VideoCapture(0)  # 使用默认摄像头
-        if not camera.isOpened():
-            print("无法打开摄像头")
-            return False
-        # 设置分辨率
-        camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        return True
+        with camera_lock:  # 使用锁保护摄像头初始化
+            if camera is not None:
+                camera.release()
+            camera = cv2.VideoCapture(0)  # 使用默认摄像头
+            if not camera.isOpened():
+                print("无法打开摄像头")
+                return False
+            # 设置分辨率
+            camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            return True
     except Exception as e:
         print(f"初始化摄像头失败: {e}")
         return False
@@ -133,6 +138,9 @@ def set_speed(speed):
     """设置速度（0-100）"""
     global current_speed
     current_speed = max(0, min(100, speed))
+    # 设置PWM占空比
+    pwm_a.ChangeDutyCycle(current_speed)
+    pwm_b.ChangeDutyCycle(current_speed)
     return f"速度已设置为: {current_speed}%"
 
 def angle_to_duty_cycle(angle):
@@ -157,48 +165,52 @@ def set_servo_v(angle):
 
 def forward():
     """小车前进"""
-    # 使用速度值调整输出
     if current_speed > 0:
         GPIO.output(IN1, GPIO.HIGH)
         GPIO.output(IN2, GPIO.LOW)
         GPIO.output(IN3, GPIO.HIGH)
         GPIO.output(IN4, GPIO.LOW)
+        pwm_a.ChangeDutyCycle(current_speed)
+        pwm_b.ChangeDutyCycle(current_speed)
     else:
         stop()
     return "前进"
 
 def backward():
     """小车后退"""
-    # 使用速度值调整输出
     if current_speed > 0:
         GPIO.output(IN1, GPIO.LOW)
         GPIO.output(IN2, GPIO.HIGH)
         GPIO.output(IN3, GPIO.LOW)
         GPIO.output(IN4, GPIO.HIGH)
+        pwm_a.ChangeDutyCycle(current_speed)
+        pwm_b.ChangeDutyCycle(current_speed)
     else:
         stop()
     return "后退"
 
 def turn_left():
     """小车左转"""
-    # 使用速度值调整输出
     if current_speed > 0:
         GPIO.output(IN1, GPIO.LOW)
         GPIO.output(IN2, GPIO.HIGH)
         GPIO.output(IN3, GPIO.HIGH)
         GPIO.output(IN4, GPIO.LOW)
+        pwm_a.ChangeDutyCycle(current_speed)
+        pwm_b.ChangeDutyCycle(current_speed)
     else:
         stop()
     return "左转"
 
 def turn_right():
     """小车右转"""
-    # 使用速度值调整输出
     if current_speed > 0:
         GPIO.output(IN1, GPIO.HIGH)
         GPIO.output(IN2, GPIO.LOW)
         GPIO.output(IN3, GPIO.LOW)
         GPIO.output(IN4, GPIO.HIGH)
+        pwm_a.ChangeDutyCycle(current_speed)
+        pwm_b.ChangeDutyCycle(current_speed)
     else:
         stop()
     return "右转"
@@ -209,6 +221,8 @@ def stop():
     GPIO.output(IN2, GPIO.LOW)
     GPIO.output(IN3, GPIO.LOW)
     GPIO.output(IN4, GPIO.LOW)
+    pwm_a.ChangeDutyCycle(0)
+    pwm_b.ChangeDutyCycle(0)
     return "停止"
 
 def send_frame(client_socket, frame):
@@ -233,7 +247,7 @@ def send_frame(client_socket, frame):
 
 def handle_client(client_socket, addr):
     """处理客户端连接"""
-    global current_speed, current_h_angle, current_v_angle
+    global current_speed, current_h_angle, current_v_angle, camera, camera_running
     
     print(f"客户端 {addr} 已连接")
     
@@ -274,25 +288,29 @@ def handle_client(client_socket, addr):
             elif action == 'start_camera':
                 if init_camera():
                     response['message'] = "摄像头已启动"
+                    camera_running = True
                     # 开始发送视频流
-                    while True:
-                        if camera is None or not camera.isOpened():
-                            print("摄像头未就绪")
-                            break
-                        ret, frame = camera.read()
-                        if not ret:
-                            print("无法读取摄像头画面")
-                            break
-                        if not send_frame(client_socket, frame):
-                            break
+                    while camera_running:
+                        with camera_lock:  # 使用锁保护摄像头访问
+                            if camera is None or not camera.isOpened():
+                                print("摄像头未就绪")
+                                break
+                            ret, frame = camera.read()
+                            if not ret:
+                                print("无法读取摄像头画面")
+                                break
+                            if not send_frame(client_socket, frame):
+                                break
                         time.sleep(0.05)  # 控制帧率
                 else:
                     response['message'] = "摄像头启动失败"
             elif action == 'stop_camera':
                 response['message'] = "摄像头已停止"
-                if camera is not None:
-                    camera.release()
-                    camera = None
+                camera_running = False
+                with camera_lock:  # 使用锁保护摄像头释放
+                    if camera is not None:
+                        camera.release()
+                        camera = None
                 break
             elif action == 'ping':
                 response['message'] = "pong"
@@ -303,11 +321,36 @@ def handle_client(client_socket, addr):
     except Exception as e:
         print(f"处理客户端 {addr} 错误: {e}")
     finally:
+        camera_running = False
+        with camera_lock:  # 使用锁保护摄像头释放
+            if camera is not None:
+                camera.release()
+                camera = None
+        client_socket.close()
+        print(f"客户端 {addr} 已断开")
+
+def cleanup():
+    """清理资源"""
+    global camera, camera_running
+    
+    # 停止摄像头
+    camera_running = False
+    with camera_lock:
         if camera is not None:
             camera.release()
             camera = None
-        client_socket.close()
-        print(f"客户端 {addr} 已断开")
+    
+    # 停止小车
+    stop()
+    
+    # 停止PWM
+    pwm_a.stop()
+    pwm_b.stop()
+    
+    # 清理GPIO
+    GPIO.cleanup()
+    
+    print("资源已清理")
 
 def main():
     # 创建服务器套接字
