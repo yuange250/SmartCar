@@ -95,9 +95,25 @@ class CarControlGUI:
         self.video_label = ttk.Label(self.video_frame)
         self.video_label.grid(row=0, column=0, padx=5, pady=5)
         
+        # 日志显示区域
+        self.log_frame = ttk.LabelFrame(self.left_frame, text="运行日志", padding="5")
+        self.log_frame.grid(row=1, column=0, columnspan=2, pady=5, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # 创建日志文本框和滚动条
+        self.log_text = tk.Text(self.log_frame, height=10, width=50, wrap=tk.WORD)
+        self.log_scrollbar = ttk.Scrollbar(self.log_frame, orient="vertical", command=self.log_text.yview)
+        self.log_text.configure(yscrollcommand=self.log_scrollbar.set)
+        
+        # 放置日志文本框和滚动条
+        self.log_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.log_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        
+        # 配置日志文本框只读
+        self.log_text.configure(state='disabled')
+        
         # 连接控制区域
         self.connection_frame = ttk.LabelFrame(self.left_frame, text="连接控制", padding="5")
-        self.connection_frame.grid(row=1, column=0, columnspan=2, pady=5, sticky=(tk.W, tk.E))
+        self.connection_frame.grid(row=2, column=0, columnspan=2, pady=5, sticky=(tk.W, tk.E))
         
         # IP地址输入
         ttk.Label(self.connection_frame, text="IP地址:").grid(row=0, column=0, padx=5, pady=5)
@@ -192,7 +208,8 @@ class CarControlGUI:
         self.main_frame.columnconfigure(1, weight=1)
         self.main_frame.rowconfigure(0, weight=1)
         self.left_frame.columnconfigure(0, weight=1)
-        self.left_frame.rowconfigure(0, weight=1)
+        self.left_frame.rowconfigure(0, weight=3)  # 视频区域占更多空间
+        self.left_frame.rowconfigure(1, weight=1)  # 日志区域
         self.right_frame.columnconfigure(0, weight=1)
         
         # 初始化变量
@@ -208,15 +225,25 @@ class CarControlGUI:
         # 设置定时器，每秒发送一次ping
         self.root.after(1000, self.send_ping)
 
+    def log_message(self, message):
+        """添加日志消息"""
+        self.log_text.configure(state='normal')
+        self.log_text.insert(tk.END, f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {message}\n")
+        self.log_text.see(tk.END)  # 滚动到最新消息
+        self.log_text.configure(state='disabled')
+
     def receive_video_stream(self):
         """接收视频流"""
         try:
             while self.video_running:
                 try:
+                    # 设置接收超时
+                    self.client_socket.settimeout(1.0)
+                    
                     # 接收帧大小（4字节）
                     size_data = self.client_socket.recv(4)
                     if not size_data:
-                        print("连接已断开")
+                        self.log_message("连接已断开")
                         break
                     
                     # 解析帧大小
@@ -224,7 +251,7 @@ class CarControlGUI:
                     
                     # 检查帧大小是否合理
                     if size <= 0 or size > 1000000:  # 设置最大帧大小为1MB
-                        print(f"收到无效的帧大小: {size}")
+                        self.log_message(f"收到无效的帧大小: {size}")
                         continue
                     
                     # 接收帧数据
@@ -233,20 +260,20 @@ class CarControlGUI:
                     while remaining > 0:
                         chunk = self.client_socket.recv(min(remaining, 8192))
                         if not chunk:
-                            print("连接已断开")
+                            self.log_message("连接已断开")
                             break
                         frame_data += chunk
                         remaining -= len(chunk)
                     
                     if len(frame_data) != size:
-                        print(f"帧数据大小不匹配: 预期 {size}, 实际 {len(frame_data)}")
+                        self.log_message(f"帧数据大小不匹配: 预期 {size}, 实际 {len(frame_data)}")
                         continue
                     
                     # 解码图像
                     try:
                         frame = cv2.imdecode(np.frombuffer(frame_data, dtype=np.uint8), cv2.IMREAD_COLOR)
                         if frame is None:
-                            print("无法解码图像")
+                            self.log_message("无法解码图像")
                             continue
                         
                         # 调整图像大小以适应显示区域
@@ -261,25 +288,34 @@ class CarControlGUI:
                         self.video_label.configure(image=photo)
                         self.video_label.image = photo
                         
+                        # 清理内存
+                        del frame
+                        del photo
+                        
                     except Exception as e:
-                        print(f"处理图像时出错: {e}")
+                        self.log_message(f"处理图像时出错: {e}")
                         continue
                     
                 except socket.timeout:
-                    print("接收视频数据超时")
+                    # 超时不是错误，继续尝试
                     continue
                 except struct.error as e:
-                    print(f"解析帧大小时出错: {e}")
+                    self.log_message(f"解析帧大小时出错: {e}")
                     continue
                 except Exception as e:
-                    print(f"接收视频流时出错: {e}")
+                    self.log_message(f"接收视频流时出错: {e}")
                     continue
                 
         except Exception as e:
-            print(f"视频流线程错误: {e}")
+            self.log_message(f"视频流线程错误: {e}")
         finally:
             self.video_running = False
-            print("视频流已停止")
+            self.log_message("视频流已停止")
+            # 清理资源
+            try:
+                self.video_label.configure(image='')
+            except:
+                pass
 
     def start_camera(self):
         """开启摄像头"""
@@ -288,6 +324,9 @@ class CarControlGUI:
             return
         
         try:
+            # 确保之前的视频流已停止
+            self.stop_camera()
+            
             # 发送开启摄像头命令
             response = self.client.send_command({'action': 'start_camera'})
             if response and response.get('message') == "摄像头已启动":
@@ -312,6 +351,7 @@ class CarControlGUI:
             self.video_running = False
             if self.video_thread:
                 self.video_thread.join(timeout=1.0)
+                self.video_thread = None
             
             # 发送关闭摄像头命令
             response = self.client.send_command({'action': 'stop_camera'})
@@ -324,6 +364,10 @@ class CarControlGUI:
                 messagebox.showerror("错误", "无法关闭摄像头")
         except Exception as e:
             messagebox.showerror("错误", f"关闭摄像头失败: {e}")
+        finally:
+            # 确保资源被清理
+            self.video_running = False
+            self.video_thread = None
 
 def main():
     # 获取服务器IP地址

@@ -289,9 +289,9 @@ def turn_left():
         GPIO.output(IN3, GPIO.HIGH)
         GPIO.output(IN4, GPIO.LOW)
         # 左轮速度降低到30%，右轮保持原速
-        turn_speed = int(current_speed * 0.3)  # 降低到30%以获得更明显的转向效果
-        pwm_a.ChangeDutyCycle(turn_speed)  # 左轮
-        pwm_b.ChangeDutyCycle(current_speed)  # 右轮
+        turn_speed = int(current_speed * 0.1)  # 降低到30%以获得更明显的转向效果
+        pwm_b.ChangeDutyCycle(turn_speed)  # 左轮
+        pwm_a.ChangeDutyCycle(current_speed)  # 右轮
     else:
         stop()
     return "左转"
@@ -304,9 +304,9 @@ def turn_right():
         GPIO.output(IN3, GPIO.HIGH)
         GPIO.output(IN4, GPIO.LOW)
         # 右轮速度降低到30%，左轮保持原速
-        turn_speed = int(current_speed * 0.3)  # 降低到30%以获得更明显的转向效果
-        pwm_a.ChangeDutyCycle(current_speed)  # 左轮
-        pwm_b.ChangeDutyCycle(turn_speed)  # 右轮
+        turn_speed = int(current_speed * 0.1)  # 降低到30%以获得更明显的转向效果
+        pwm_b.ChangeDutyCycle(current_speed)  # 左轮
+        pwm_a.ChangeDutyCycle(turn_speed)  # 右轮
     else:
         stop()
     return "右转"
