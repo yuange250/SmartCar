@@ -207,30 +207,9 @@ def set_speed(speed):
     global current_speed
     current_speed = max(0, min(100, speed))
     # 根据当前运动状态设置PWM占空比
-    if GPIO.input(IN1) == GPIO.HIGH and GPIO.input(IN2) == GPIO.LOW and \
-       GPIO.input(IN3) == GPIO.HIGH and GPIO.input(IN4) == GPIO.LOW:
-        # 前进状态
-        pwm_a.ChangeDutyCycle(current_speed)
-        pwm_b.ChangeDutyCycle(current_speed)
-    elif GPIO.input(IN1) == GPIO.LOW and GPIO.input(IN2) == GPIO.HIGH and \
-         GPIO.input(IN3) == GPIO.LOW and GPIO.input(IN4) == GPIO.HIGH:
-        # 后退状态
-        pwm_a.ChangeDutyCycle(current_speed)
-        pwm_b.ChangeDutyCycle(current_speed)
-    elif GPIO.input(IN1) == GPIO.HIGH and GPIO.input(IN2) == GPIO.LOW and \
-         GPIO.input(IN3) == GPIO.HIGH and GPIO.input(IN4) == GPIO.LOW and \
-         pwm_b.duty_cycle < pwm_a.duty_cycle:
-        # 左转状态
-        turn_speed = int(current_speed * 0.1)
-        pwm_b.ChangeDutyCycle(turn_speed)
-        pwm_a.ChangeDutyCycle(current_speed)
-    elif GPIO.input(IN1) == GPIO.HIGH and GPIO.input(IN2) == GPIO.LOW and \
-         GPIO.input(IN3) == GPIO.HIGH and GPIO.input(IN4) == GPIO.LOW and \
-         pwm_a.duty_cycle < pwm_b.duty_cycle:
-        # 右转状态
-        turn_speed = int(current_speed * 0.1)
-        pwm_a.ChangeDutyCycle(turn_speed)
-        pwm_b.ChangeDutyCycle(current_speed)
+    pwm_a.ChangeDutyCycle(current_speed)
+    pwm_b.ChangeDutyCycle(current_speed)
+
     return f"速度已设置为: {current_speed}%"
 
 def angle_to_duty_cycle(angle):
