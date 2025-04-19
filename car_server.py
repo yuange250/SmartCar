@@ -39,12 +39,12 @@ camera_thread = None  # 添加摄像头线程变量
 
 class CarServer:
     def __init__(self, control_port=5000, video_port=5001):
-        # 初始化GPIO和电机控制
-        self.setup_gpio()
-        
-        # 初始化相机
-        self.setup_camera()
-        
+        # 舵机相关引脚和参数
+        self.PIN_SERVO_HORIZONTAL = SERVO_H  # 水平舵机
+        self.PIN_SERVO_VERTICAL = SERVO_V    # 垂直舵机
+        self.servo_h_angle = 90         # 水平舵机初始角度
+        self.servo_v_angle = 90         # 垂直舵机初始角度
+
         # 服务器配置
         self.control_port = control_port
         self.video_port = video_port
@@ -61,12 +61,11 @@ class CarServer:
         self.frame_interval = 1/30  # 30 FPS
         self.video_running = False
         self.video_thread = None
+        # 初始化GPIO和电机控制
+        self.setup_gpio()
 
-        # 舵机相关引脚和参数
-        self.PIN_SERVO_HORIZONTAL = SERVO_H  # 水平舵机
-        self.PIN_SERVO_VERTICAL = SERVO_V    # 垂直舵机
-        self.servo_h_angle = 90         # 水平舵机初始角度
-        self.servo_v_angle = 90         # 垂直舵机初始角度
+        # 初始化相机
+        self.setup_camera()
 
     def setup_camera(self):
         """初始化相机"""
