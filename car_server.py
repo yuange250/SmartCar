@@ -118,34 +118,6 @@ def camera_stream_thread(client_socket):
     finally:
         camera_running = False
 
-def start_camera_stream(client_socket):
-    """启动摄像头流"""
-    global camera, camera_running, camera_thread
-    
-    if camera_running:
-        return "摄像头已经在运行"
-    
-    try:
-        # 初始化摄像头
-        camera = cv2.VideoCapture(0)
-        if not camera.isOpened():
-            return "无法打开摄像头"
-        
-        # 设置摄像头分辨率
-        camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        
-        # 设置摄像头帧率
-        camera.set(cv2.CAP_PROP_FPS, 15)  # 降低帧率到15fps
-        
-        camera_running = True
-        camera_thread = threading.Thread(target=lambda: send_video_stream(client_socket))
-        camera_thread.daemon = True
-        camera_thread.start()
-        return "摄像头已启动"
-    except Exception as e:
-        return f"启动摄像头失败: {e}"
-
 def send_video_stream(client_socket):
     """发送视频流"""
     global camera, camera_running
@@ -154,13 +126,19 @@ def send_video_stream(client_socket):
         while camera_running:
             with camera_lock:
                 if camera is None or not camera.isOpened():
-                    break
+                    print("摄像头未打开或已关闭，尝试重新初始化...")
+                    if not init_camera():
+                        print("重新初始化摄像头失败")
+                        break
                 
                 # 读取一帧
                 ret, frame = camera.read()
                 if not ret:
-                    print("无法读取摄像头帧")
-                    time.sleep(0.1)  # 短暂等待后重试
+                    print("无法读取摄像头帧，尝试重新初始化...")
+                    camera.release()
+                    if not init_camera():
+                        print("重新初始化摄像头失败")
+                        break
                     continue
                 
                 # 减小分辨率
@@ -177,9 +155,6 @@ def send_video_stream(client_socket):
                     size_data = struct.pack('>L', size)
                     client_socket.sendall(size_data)
                     
-                    # 短暂延迟，确保大小信息被完整接收
-                    time.sleep(0.01)
-                    
                     # 发送帧数据
                     client_socket.sendall(frame_data)
                     
@@ -195,12 +170,37 @@ def send_video_stream(client_socket):
         camera_running = False
         print("视频流已停止")
 
+def start_camera_stream(client_socket):
+    """启动摄像头流"""
+    global camera, camera_running, camera_thread
+    
+    if camera_running:
+        return "摄像头已经在运行"
+    
+    try:
+        # 初始化摄像头
+        if not init_camera():
+            return "无法打开摄像头"
+        
+        camera_running = True
+        camera_thread = threading.Thread(target=send_video_stream, args=(client_socket,))
+        camera_thread.daemon = True
+        camera_thread.start()
+        return "摄像头已启动"
+    except Exception as e:
+        return f"启动摄像头失败: {e}"
+
 def stop_camera_stream():
     """停止摄像头流"""
-    global camera_running
+    global camera_running, camera
     camera_running = False
     if camera_thread:
         camera_thread.join(timeout=1.0)
+    with camera_lock:
+        if camera is not None:
+            camera.release()
+            camera = None
+    print("摄像头已停止")
 
 def set_speed(speed):
     """设置速度（0-100）"""
@@ -401,12 +401,8 @@ def handle_client(client_socket, addr):
             elif action == 'start_camera':
                 response['message'] = start_camera_stream(client_socket)
             elif action == 'stop_camera':
+                stop_camera_stream()
                 response['message'] = "摄像头已停止"
-                camera_running = False
-                with camera_lock:  # 使用锁保护摄像头释放
-                    if camera is not None:
-                        camera.release()
-                        camera = None
                 break
             elif action == 'ping':
                 response['message'] = "pong"
@@ -420,11 +416,7 @@ def handle_client(client_socket, addr):
     except Exception as e:
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 处理客户端 {addr} 错误: {e}")
     finally:
-        camera_running = False
-        with camera_lock:  # 使用锁保护摄像头释放
-            if camera is not None:
-                camera.release()
-                camera = None
+        stop_camera_stream()
         client_socket.close()
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 客户端 {addr} 已断开")
 
