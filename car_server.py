@@ -157,7 +157,8 @@ def send_video_stream(client_socket):
                     
                     # 发送帧数据
                     client_socket.sendall(frame_data)
-                    
+                    print(f"发送视频帧")
+
                     # 控制帧率
                     time.sleep(1/15)  # 限制为15fps
                 except socket.error as e:
@@ -351,7 +352,7 @@ def handle_client(client_socket, addr):
             value = command.get('value', 50)
             
             # 记录接收到的命令
-            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 收到命令 - 客户端: {addr}, 动作: {action}, 值: {value}")
+            # print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 收到命令 - 客户端: {addr}, 动作: {action}, 值: {value}")
             
             response = {'message': '', 'current_speed': current_speed, 
                        'current_h_angle': current_h_angle, 'current_v_angle': current_v_angle}
@@ -386,7 +387,7 @@ def handle_client(client_socket, addr):
                 response['message'] = "pong"
             
             # 记录命令执行结果
-            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 执行结果 - 客户端: {addr}, 响应: {response['message']}")
+            # print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 执行结果 - 客户端: {addr}, 响应: {response['message']}")
             
             # 发送响应
             client_socket.send(json.dumps(response).encode('utf-8'))

@@ -365,6 +365,7 @@ class CarClientGUI:
     def receive_video(self):
         """接收视频流"""
         while self.camera_running:
+            self.log(f"接受到图像")
             try:
                 if not self.connected or self.socket is None:
                     print("连接已断开")
@@ -409,7 +410,7 @@ class CarClientGUI:
                         remaining -= len(packet)
                     except socket.error as e:
                         print(f"接收数据错误: {e}")
-                        break
+                        continue
                 
                 if len(frame_data) == size:
                     # 解码图像
@@ -455,7 +456,8 @@ class CarClientGUI:
             except Exception as e:
                 print(f"接收视频错误: {e}")
                 continue
-        
+        self.log(f"跳出不接受了")
+
         self.camera_running = False
         self.frame_counter = 0  # 重置帧计数器
         self.root.after(0, lambda: self.camera_button.configure(text="开启摄像头"))
