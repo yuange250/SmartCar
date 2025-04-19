@@ -387,7 +387,7 @@ class CarClientGUI:
                         continue
                         
                     size = struct.unpack('>L', size_data)[0]
-                    if size > 100000:  # 限制最大帧大小
+                    if size > 1e8:  # 限制最大帧大小为1e8字节
                         print(f"帧大小异常: {size}")
                         continue
                     
