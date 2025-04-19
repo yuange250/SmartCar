@@ -209,79 +209,92 @@ def stop():
     GPIO.output(IN4, GPIO.LOW)
     return "停止"
 
+def send_frame(client_socket, frame):
+    """发送视频帧"""
+    try:
+        # 压缩图像
+        _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+        frame_data = buffer.tobytes()
+        
+        # 发送帧大小（4字节）
+        size = len(frame_data)
+        size_bytes = struct.pack('>L', size)
+        client_socket.sendall(size_bytes)
+        
+        # 发送帧数据
+        client_socket.sendall(frame_data)
+        
+    except Exception as e:
+        print(f"发送视频帧错误: {e}")
+        return False
+    return True
+
 def handle_client(client_socket, addr):
     """处理客户端连接"""
+    global current_speed, current_h_angle, current_v_angle
+    
     print(f"客户端 {addr} 已连接")
+    
     try:
         while True:
-            # 接收客户端命令
+            # 接收命令
             data = client_socket.recv(1024).decode('utf-8')
             if not data:
                 break
-
-            # 解析命令
-            try:
-                command = json.loads(data)
-                action = command.get('action', '').lower()
-                response = ""
-
-                # 处理命令
-                if action == 'forward':
-                    response = forward()
-                elif action == 'backward':
-                    response = backward()
-                elif action == 'left':
-                    response = turn_left()
-                elif action == 'right':
-                    response = turn_right()
-                elif action == 'stop':
-                    response = stop()
-                elif action == 'speed':
-                    speed = command.get('value', 50)
-                    response = set_speed(speed)
-                elif action == 'servo_h':
-                    angle = command.get('value', 90)
-                    response = set_servo_h(angle)
-                elif action == 'servo_v':
-                    angle = command.get('value', 90)
-                    response = set_servo_v(angle)
-                elif action == 'start_camera':
-                    if init_camera():
-                        start_camera_stream(client_socket)
-                        response = "摄像头已启动"
-                    else:
-                        response = "摄像头启动失败"
-                elif action == 'stop_camera':
-                    stop_camera_stream()
-                    release_camera()
-                    response = "摄像头已停止"
-                elif action == 'ping':
-                    response = "pong"
-                else:
-                    response = "未知命令"
-
-                # 发送响应
-                client_socket.send(json.dumps({
-                    'status': 'success',
-                    'message': response,
-                    'current_speed': current_speed,
-                    'current_h_angle': current_h_angle,
-                    'current_v_angle': current_v_angle
-                }).encode('utf-8'))
-
-            except json.JSONDecodeError:
-                client_socket.send(json.dumps({
-                    'status': 'error',
-                    'response': '无效的命令格式'
-                }).encode('utf-8'))
-
+                
+            command = json.loads(data)
+            action = command.get('action', '')
+            value = command.get('value', 50)
+            
+            response = {'message': '', 'current_speed': current_speed, 
+                       'current_h_angle': current_h_angle, 'current_v_angle': current_v_angle}
+            
+            # 处理命令
+            if action == 'forward':
+                response['message'] = forward()
+            elif action == 'backward':
+                response['message'] = backward()
+            elif action == 'left':
+                response['message'] = turn_left()
+            elif action == 'right':
+                response['message'] = turn_right()
+            elif action == 'stop':
+                response['message'] = stop()
+            elif action == 'speed':
+                current_speed = value
+                response['message'] = set_speed(value)
+            elif action == 'servo_h':
+                current_h_angle = value
+                response['message'] = set_servo_h(value)
+            elif action == 'servo_v':
+                current_v_angle = value
+                response['message'] = set_servo_v(value)
+            elif action == 'start_camera':
+                response['message'] = "摄像头已启动"
+                # 开始发送视频流
+                while True:
+                    ret, frame = camera.read()
+                    if not ret:
+                        break
+                    if not send_frame(client_socket, frame):
+                        break
+                    time.sleep(0.05)  # 控制帧率
+            elif action == 'stop_camera':
+                response['message'] = "摄像头已停止"
+                break
+            elif action == 'ping':
+                response['message'] = "pong"
+            
+            # 发送响应
+            client_socket.send(json.dumps(response).encode('utf-8'))
+            
     except Exception as e:
-        print(f"处理客户端 {addr} 时发生错误: {e}")
+        print(f"处理客户端 {addr} 错误: {e}")
     finally:
         stop_camera_stream()
         release_camera()
         client_socket.close()
-        print(f"客户端 {addr} 已断开连接")
+        print(f"客户端 {addr} 已断开")
 
 def main():
     # 创建服务器套接字
