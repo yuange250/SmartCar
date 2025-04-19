@@ -163,8 +163,11 @@ def send_video_stream(client_socket):
                     time.sleep(0.1)  # 短暂等待后重试
                     continue
                 
+                # 减小分辨率
+                frame = cv2.resize(frame, (320, 240))  # 降低分辨率到320x240
+                
                 # 压缩图像
-                _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 40])  # 降低质量到40%
+                _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 30])  # 降低质量到30%
                 frame_data = buffer.tobytes()
                 
                 # 发送帧大小
