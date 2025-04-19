@@ -206,9 +206,27 @@ def set_speed(speed):
     """设置速度（0-100）"""
     global current_speed
     current_speed = max(0, min(100, speed))
-    # 设置PWM占空比
-    pwm_a.ChangeDutyCycle(current_speed)
-    pwm_b.ChangeDutyCycle(current_speed)
+    # 根据当前运动状态设置PWM占空比
+    if GPIO.input(IN1) == GPIO.HIGH and GPIO.input(IN2) == GPIO.LOW and \
+       GPIO.input(IN3) == GPIO.HIGH and GPIO.input(IN4) == GPIO.LOW:
+        # 前进状态
+        pwm_a.ChangeDutyCycle(current_speed)
+        pwm_b.ChangeDutyCycle(current_speed)
+    elif GPIO.input(IN1) == GPIO.LOW and GPIO.input(IN2) == GPIO.HIGH and \
+         GPIO.input(IN3) == GPIO.LOW and GPIO.input(IN4) == GPIO.HIGH:
+        # 后退状态
+        pwm_a.ChangeDutyCycle(current_speed)
+        pwm_b.ChangeDutyCycle(current_speed)
+    elif GPIO.input(IN1) == GPIO.HIGH and GPIO.input(IN2) == GPIO.LOW and \
+         GPIO.input(IN3) == GPIO.LOW and GPIO.input(IN4) == GPIO.LOW:
+        # 左转状态
+        pwm_a.ChangeDutyCycle(current_speed)
+        pwm_b.ChangeDutyCycle(0)
+    elif GPIO.input(IN1) == GPIO.LOW and GPIO.input(IN2) == GPIO.LOW and \
+         GPIO.input(IN3) == GPIO.HIGH and GPIO.input(IN4) == GPIO.LOW:
+        # 右转状态
+        pwm_a.ChangeDutyCycle(0)
+        pwm_b.ChangeDutyCycle(current_speed)
     return f"速度已设置为: {current_speed}%"
 
 def angle_to_duty_cycle(angle):
@@ -238,6 +256,9 @@ def forward():
         GPIO.output(IN2, GPIO.LOW)
         GPIO.output(IN3, GPIO.HIGH)
         GPIO.output(IN4, GPIO.LOW)
+        # 设置PWM占空比
+        pwm_a.ChangeDutyCycle(current_speed)
+        pwm_b.ChangeDutyCycle(current_speed)
     else:
         stop()
     return "前进"
@@ -249,6 +270,9 @@ def backward():
         GPIO.output(IN2, GPIO.HIGH)
         GPIO.output(IN3, GPIO.LOW)
         GPIO.output(IN4, GPIO.HIGH)
+        # 设置PWM占空比
+        pwm_a.ChangeDutyCycle(current_speed)
+        pwm_b.ChangeDutyCycle(current_speed)
     else:
         stop()
     return "后退"
@@ -260,6 +284,9 @@ def turn_left():
         GPIO.output(IN2, GPIO.LOW)
         GPIO.output(IN3, GPIO.LOW)
         GPIO.output(IN4, GPIO.LOW)
+        # 设置PWM占空比
+        pwm_a.ChangeDutyCycle(current_speed)
+        pwm_b.ChangeDutyCycle(0)  # 右轮停止
     else:
         stop()
     return "左转"
@@ -271,6 +298,9 @@ def turn_right():
         GPIO.output(IN2, GPIO.LOW)
         GPIO.output(IN3, GPIO.HIGH)
         GPIO.output(IN4, GPIO.LOW)
+        # 设置PWM占空比
+        pwm_a.ChangeDutyCycle(0)  # 左轮停止
+        pwm_b.ChangeDutyCycle(current_speed)
     else:
         stop()
     return "右转"
