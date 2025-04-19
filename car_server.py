@@ -103,24 +103,24 @@ def handle_client(client_socket, addr):
             # 解析命令
             try:
                 command = json.loads(data)
-                cmd = command.get('command', '').lower()
+                action = command.get('action', '').lower()
                 response = ""
 
                 # 处理命令
-                if cmd == 'forward':
+                if action == 'forward':
                     response = forward()
-                elif cmd == 'backward':
+                elif action == 'backward':
                     response = backward()
-                elif cmd == 'left':
+                elif action == 'left':
                     response = turn_left()
-                elif cmd == 'right':
+                elif action == 'right':
                     response = turn_right()
-                elif cmd == 'stop':
+                elif action == 'stop':
                     response = stop()
-                elif cmd == 'speed':
-                    speed = command.get('speed', 50)
+                elif action == 'speed':
+                    speed = command.get('value', 50)
                     response = set_speed(speed)
-                elif cmd == 'ping':
+                elif action == 'ping':
                     response = "pong"
                 else:
                     response = "未知命令"
@@ -128,8 +128,8 @@ def handle_client(client_socket, addr):
                 # 发送响应
                 client_socket.send(json.dumps({
                     'status': 'success',
-                    'response': response,
-                    'speed': current_speed
+                    'message': response,
+                    'current_speed': current_speed
                 }).encode('utf-8'))
 
             except json.JSONDecodeError:
