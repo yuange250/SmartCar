@@ -105,9 +105,13 @@ class SmartCarApp:
     def on_video_window_close(self):
         """处理视频窗口关闭"""
         if self.video_window:
-            self.video_window.cleanup()
-            self.video_window.root.destroy()
-            self.video_window = None
+            try:
+                if hasattr(self.video_window, 'cleanup'):
+                    self.video_window.cleanup()
+                self.video_window.root.destroy()
+                self.video_window = None
+            except Exception as e:
+                print(f"关闭视频窗口时出错: {e}")
         self.check_windows_status()
 
     def on_control_window_close(self):

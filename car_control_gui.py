@@ -29,9 +29,6 @@ class CarControlGUI:
         self.last_command_time = 0
         self.command_interval = 0.1  # 命令发送间隔（秒）
         
-        # 添加清理标志
-        self.is_running = True
-        
         # 创建界面元素
         self.create_widgets()
         
@@ -147,25 +144,14 @@ class CarControlGUI:
         self.logger.setLevel(logging.INFO)
 
     def setup_keyboard_control(self):
-        """设置键盘控制"""
         self.root.bind('<KeyPress>', self.on_key_press)
         self.root.bind('<KeyRelease>', self.on_key_release)
-        
-        # 添加按键状态跟踪
-        self.pressed_keys = set()
 
     def on_key_press(self, event):
-        """按键按下处理"""
         if not self.connected:
             return
             
         key = event.keysym.lower()
-        
-        # 避免按键重复触发
-        if key in self.pressed_keys:
-            return
-        self.pressed_keys.add(key)
-        
         if key == 'w':
             self.move_forward()
         elif key == 's':
@@ -178,23 +164,18 @@ class CarControlGUI:
             self.stop()
 
     def on_key_release(self, event):
-        """按键释放处理"""
         if not self.connected:
             return
             
         key = event.keysym.lower()
-        if key in self.pressed_keys:
-            self.pressed_keys.remove(key)
-            
         if key in ['w', 's', 'a', 'd']:
             self.stop()
 
     def on_speed_change(self, value):
-        """速度变化处理"""
+        """处理速度变化"""
         try:
             self.current_speed = int(float(value))
             self.speed_label.configure(text=f"当前速度: {self.current_speed}%")
-            self.logger.info(f"速度设置为: {self.current_speed}%")
         except Exception as e:
             self.logger.error(f"更新速度显示失败: {e}")
 
@@ -243,10 +224,12 @@ class CarControlGUI:
                 
                 self.connected = False
                 self.connect_button.configure(text="连接")
-                self.logger.info("已断开连接")
+                if hasattr(self, 'logger'):
+                    self.logger.info("已断开连接")
                 
             except Exception as e:
-                self.logger.error(f"断开连接时出错: {e}")
+                if hasattr(self, 'logger'):
+                    self.logger.error(f"断开连接时出错: {e}")
                 self.connected = False
                 self.connect_button.configure(text="连接")
 
@@ -254,11 +237,7 @@ class CarControlGUI:
         """发送控制命令"""
         if not self.connected or not self.socket:
             return
-        
-        current_time = time.time()
-        if current_time - self.last_command_time < self.command_interval:
-            return
-        
+            
         try:
             # 构建命令数据
             data = {
@@ -268,41 +247,42 @@ class CarControlGUI:
             
             # 发送命令
             self.socket.send(json.dumps(data).encode())
-            self.last_command_time = current_time
             
         except Exception as e:
-            self.logger.error(f"发送命令失败: {e}")
+            if hasattr(self, 'logger'):
+                self.logger.error(f"发送命令失败: {e}")
             self.disconnect()
 
     def move_forward(self):
-        """前进"""
         if self.connected:
             self.send_command('forward')
             self.logger.info("前进")
 
     def move_backward(self):
-        """后退"""
         if self.connected:
             self.send_command('backward')
             self.logger.info("后退")
 
     def turn_left(self):
-        """左转"""
         if self.connected:
             self.send_command('left')
             self.logger.info("左转")
 
     def turn_right(self):
-        """右转"""
         if self.connected:
             self.send_command('right')
             self.logger.info("右转")
 
     def stop(self):
-        """停止"""
+        """停止所有运动"""
         if self.connected:
-            self.send_command('stop')
-            self.logger.info("停止")
+            try:
+                self.send_command('stop')
+                if hasattr(self, 'logger'):
+                    self.logger.info("停止")
+            except Exception as e:
+                if hasattr(self, 'logger'):
+                    self.logger.error(f"停止失败: {e}")
 
     def on_closing(self):
         """窗口关闭处理"""
@@ -320,29 +300,43 @@ class CarControlGUI:
     def cleanup(self):
         """清理资源"""
         try:
-            # 断开连接
+            # 停止所有运动
             if self.connected:
-                self.disconnect()
+                try:
+                    self.stop()
+                except:
+                    pass
             
-            # 停止所有可能的定时任务
+            # 断开连接
+            self.disconnect()
+            
+            # 停止所有定时任务
             if hasattr(self, 'root'):
-                for after_id in self.root.tk.eval('after info').split():
-                    try:
-                        self.root.after_cancel(after_id)
-                    except:
-                        pass
-            
-            # 标记程序结束
-            self.is_running = False
+                try:
+                    # 取消所有after任务
+                    for after_id in self.root.tk.eval('after info').split():
+                        try:
+                            self.root.after_cancel(int(after_id))
+                        except:
+                            pass
+                except:
+                    pass
             
             # 清理日志处理器
             if hasattr(self, 'logger'):
-                for handler in self.logger.handlers[:]:
-                    try:
-                        handler.close()
-                        self.logger.removeHandler(handler)
-                    except:
-                        pass
+                try:
+                    # 记录清理操作
+                    self.logger.info("正在清理资源...")
+                    
+                    # 清理所有日志处理器
+                    for handler in self.logger.handlers[:]:
+                        try:
+                            handler.close()
+                            self.logger.removeHandler(handler)
+                        except:
+                            pass
+                except:
+                    pass
             
             # 关闭socket连接
             if hasattr(self, 'socket') and self.socket:
@@ -352,7 +346,7 @@ class CarControlGUI:
                     pass
                 self.socket = None
             
-            self.logger.info("资源清理完成")
+            print("资源清理完成")
             
         except Exception as e:
             print(f"清理资源时出错: {e}")
