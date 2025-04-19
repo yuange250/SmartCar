@@ -263,15 +263,9 @@ class CarServer:
         GPIO.setup(ENA, GPIO.OUT)
         GPIO.setup(ENB, GPIO.OUT)
 
-        # 设置舵机GPIO为输出模式
-        GPIO.setup(SERVO_H, GPIO.OUT)
-        GPIO.setup(SERVO_V, GPIO.OUT)
-
         # 创建PWM对象
         self.pwm_a = GPIO.PWM(ENA, 100)  # 频率100Hz
         self.pwm_b = GPIO.PWM(ENB, 100)  # 频率100Hz
-        self.pwm_h = GPIO.PWM(SERVO_H, 50)
-        self.pwm_v = GPIO.PWM(SERVO_V, 50)
 
         # 启动PWM
         self.pwm_a.start(0)
