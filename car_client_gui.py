@@ -218,17 +218,45 @@ class CarClientGUI:
             if value is not None:
                 command['value'] = value
             
+            # 发送命令
             self.socket.send(json.dumps(command).encode('utf-8'))
-            response = self.socket.recv(1024).decode('utf-8')
-            response_data = json.loads(response)
             
-            if 'current_speed' in response_data:
-                self.current_speed = response_data['current_speed']
-                self.speed_var.set(self.current_speed)
-                self.speed_label['text'] = f"{self.current_speed}%"
-            
-            self.log(response_data['message'])
-            return True
+            # 接收响应
+            try:
+                response = self.socket.recv(1024)
+                if not response:
+                    self.log("服务器断开连接")
+                    self.disconnect()
+                    return False
+                
+                # 尝试解码响应
+                try:
+                    response_text = response.decode('utf-8')
+                    self.log(f"收到响应: {response_text}")  # 添加调试日志
+                    response_data = json.loads(response_text)
+                except UnicodeDecodeError as e:
+                    self.log(f"接收到的数据不是有效的UTF-8编码: {e}")
+                    self.log(f"原始数据: {response}")
+                    return False
+                except json.JSONDecodeError as e:
+                    self.log(f"接收到的数据不是有效的JSON格式: {e}")
+                    self.log(f"原始数据: {response_text}")
+                    return False
+                
+                # 处理响应
+                if 'current_speed' in response_data:
+                    self.current_speed = response_data['current_speed']
+                    self.speed_var.set(self.current_speed)
+                    self.speed_label['text'] = f"{self.current_speed}%"
+                
+                if 'message' in response_data:
+                    self.log(response_data['message'])
+                return True
+                
+            except socket.error as e:
+                self.log(f"接收响应错误: {e}")
+                self.disconnect()
+                return False
             
         except Exception as e:
             self.log(f"发送命令失败: {e}")
@@ -323,17 +351,25 @@ class CarClientGUI:
         """接收视频流"""
         while self.camera_running:
             try:
+                if not self.connected or self.socket is None:
+                    print("连接已断开")
+                    break
+                    
                 # 设置接收超时
                 self.socket.settimeout(1.0)
                 
                 # 接收帧大小
-                size_data = self.socket.recv(4)
-                if not size_data:
-                    print("连接已断开")
+                try:
+                    size_data = self.socket.recv(4)
+                    if not size_data:
+                        print("连接已断开")
+                        break
+                except socket.error as e:
+                    print(f"接收数据错误: {e}")
                     break
-                    
+                
                 size = struct.unpack('>L', size_data)[0]
-                if size > 1000000:  # 防止接收过大的数据
+                if size > 100000:  # 限制最大帧大小
                     print(f"帧大小异常: {size}")
                     continue
                 
@@ -341,11 +377,16 @@ class CarClientGUI:
                 frame_data = b''
                 remaining = size
                 while remaining > 0:
-                    packet = self.socket.recv(min(remaining, 8192))
-                    if not packet:
+                    try:
+                        packet = self.socket.recv(min(remaining, 8192))
+                        if not packet:
+                            print("连接已断开")
+                            break
+                        frame_data += packet
+                        remaining -= len(packet)
+                    except socket.error as e:
+                        print(f"接收数据错误: {e}")
                         break
-                    frame_data += packet
-                    remaining -= len(packet)
                 
                 if len(frame_data) == size:
                     # 解码图像
@@ -383,6 +424,7 @@ class CarClientGUI:
         
         self.camera_running = False
         self.root.after(0, lambda: self.camera_button.configure(text="开启摄像头"))
+        self.root.after(0, lambda: self.log("视频流已停止"))
 
     def update_video_frame(self, photo):
         """在主线程中更新视频帧"""
@@ -409,8 +451,11 @@ class CarClientGUI:
 
     def on_closing(self):
         """窗口关闭时的处理"""
-        self.running = False
-        self.disconnect()
+        self.camera_running = False
+        if self.camera_thread:
+            self.camera_thread.join(timeout=1.0)
+        if self.connected:
+            self.disconnect()
         self.root.destroy()
 
 def main():

@@ -228,12 +228,23 @@ def stop():
 def send_frame(client_socket, frame):
     """发送视频帧"""
     try:
+        # 调整图像大小以减少数据量
+        frame = cv2.resize(frame, (320, 240))
+        
         # 压缩图像
-        _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 50]  # 降低质量以减少数据量
+        _, buffer = cv2.imencode('.jpg', frame, encode_param)
         frame_data = buffer.tobytes()
         
-        # 发送帧大小（4字节）
+        # 检查帧大小
         size = len(frame_data)
+        if size > 100000:  # 如果帧太大，进一步压缩
+            encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 30]
+            _, buffer = cv2.imencode('.jpg', frame, encode_param)
+            frame_data = buffer.tobytes()
+            size = len(frame_data)
+        
+        # 发送帧大小（4字节）
         size_bytes = struct.pack('>L', size)
         client_socket.sendall(size_bytes)
         
