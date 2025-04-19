@@ -667,6 +667,70 @@ class CarServer:
                 if self.running:
                     print(f"接受控制连接时出错: {e}")
 
+    def set_motor_speed(self, left_speed, right_speed):
+        """设置电机速度
+        
+        Args:
+            left_speed: 左电机速度 (-100 到 100)
+            right_speed: 右电机速度 (-100 到 100)
+        """
+        try:
+            # 左电机
+            if left_speed >= 0:
+                GPIO.output(IN1, GPIO.HIGH)
+                GPIO.output(IN2, GPIO.LOW)
+                GPIO.output(IN3, GPIO.HIGH)
+                GPIO.output(IN4, GPIO.LOW)
+                self.pwm_a.ChangeDutyCycle(abs(left_speed))
+                self.pwm_b.ChangeDutyCycle(abs(left_speed))
+            else:
+                GPIO.output(IN1, GPIO.LOW)
+                GPIO.output(IN2, GPIO.HIGH)
+                GPIO.output(IN3, GPIO.LOW)
+                GPIO.output(IN4, GPIO.HIGH)
+                self.pwm_a.ChangeDutyCycle(abs(left_speed))
+                self.pwm_b.ChangeDutyCycle(abs(left_speed))
+            
+            # 右电机
+            if right_speed >= 0:
+                GPIO.output(IN1, GPIO.HIGH)
+                GPIO.output(IN2, GPIO.LOW)
+                GPIO.output(IN3, GPIO.HIGH)
+                GPIO.output(IN4, GPIO.LOW)
+                self.pwm_a.ChangeDutyCycle(abs(right_speed))
+                self.pwm_b.ChangeDutyCycle(abs(right_speed))
+            else:
+                GPIO.output(IN1, GPIO.LOW)
+                GPIO.output(IN2, GPIO.HIGH)
+                GPIO.output(IN3, GPIO.LOW)
+                GPIO.output(IN4, GPIO.HIGH)
+                self.pwm_a.ChangeDutyCycle(abs(right_speed))
+                self.pwm_b.ChangeDutyCycle(abs(right_speed))
+            
+        except Exception as e:
+            print(f"设置电机速度失败: {e}")
+            self.stop()
+
+    def move_forward(self, speed):
+        """前进"""
+        self.set_motor_speed(speed, speed)
+
+    def move_backward(self, speed):
+        """后退"""
+        self.set_motor_speed(-speed, -speed)
+
+    def turn_left(self, speed):
+        """左转"""
+        right_speed = speed
+        left_speed = speed * 0.1  # 左轮速度降为10%
+        self.set_motor_speed(left_speed, right_speed)
+
+    def turn_right(self, speed):
+        """右转"""
+        left_speed = speed
+        right_speed = speed * 0.1  # 右轮速度降为10%
+        self.set_motor_speed(left_speed, right_speed)
+
 def main():
     server = CarServer()
     try:
