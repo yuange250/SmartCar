@@ -217,6 +217,7 @@ class CarControlGUI:
         self.is_connected = False
         self.video_thread = None
         self.video_running = False
+        self.frame_counter = 0  # 添加帧计数器
         
         # 绑定键盘事件
         self.root.bind('<Key>', self.on_key_press)
@@ -276,6 +277,13 @@ class CarControlGUI:
                             self.log_message("无法解码图像")
                             continue
                         
+                        # 增加帧计数
+                        self.frame_counter += 1
+                        
+                        # 每15帧打印一次日志
+                        if self.frame_counter % 15 == 0:
+                            self.log_message(f"已接收 {self.frame_counter} 帧视频")
+                        
                         # 调整图像大小以适应显示区域
                         frame = cv2.resize(frame, (640, 480))
                         
@@ -310,6 +318,7 @@ class CarControlGUI:
             self.log_message(f"视频流线程错误: {e}")
         finally:
             self.video_running = False
+            self.frame_counter = 0  # 重置帧计数器
             self.log_message("视频流已停止")
             # 清理资源
             try:

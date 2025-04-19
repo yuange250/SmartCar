@@ -22,6 +22,7 @@ class CarClientGUI:
         self.current_speed = 50
         self.camera_running = False
         self.camera_thread = None
+        self.frame_counter = 0  # 添加帧计数器
         
         # 设置窗口
         self.root.title("小车远程控制系统")
@@ -419,6 +420,13 @@ class CarClientGUI:
                         
                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     
+                    # 增加帧计数
+                    self.frame_counter += 1
+                    
+                    # 每15帧打印一次日志
+                    if self.frame_counter % 15 == 0:
+                        self.log(f"已接收 {self.frame_counter} 帧视频")
+                    
                     # 调整大小以适应显示
                     height, width = frame.shape[:2]
                     max_size = 400
@@ -440,7 +448,8 @@ class CarClientGUI:
                     
                     # 添加短暂延迟，与服务器端帧率同步
                     time.sleep(0.05)
-                    
+                else:
+                    self.log(f"解析图像失败，已接收 {self.frame_counter} 帧视频")
             except socket.timeout:
                 continue
             except Exception as e:
@@ -448,6 +457,7 @@ class CarClientGUI:
                 continue
         
         self.camera_running = False
+        self.frame_counter = 0  # 重置帧计数器
         self.root.after(0, lambda: self.camera_button.configure(text="开启摄像头"))
         self.root.after(0, lambda: self.log("视频流已停止"))
 
