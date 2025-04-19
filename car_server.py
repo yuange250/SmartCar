@@ -10,7 +10,6 @@ import struct
 import io
 import base64
 from PIL import Image
-from picamera2 import Picamera2
 import pickle
 
 # 设置GPIO模式为BCM
