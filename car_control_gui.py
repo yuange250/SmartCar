@@ -7,10 +7,11 @@ import threading
 import time
 
 class CarControlGUI:
-    def __init__(self, host="192.168.1.100", port=5000):  # 控制使用5000端口
-        # 创建主窗口
-        self.root = tk.Tk()
-        self.root.title("智能小车 - 控制面板")
+    def __init__(self, root, host="192.168.1.100", port=5000):
+        # 使用传入的root窗口
+        self.root = root
+        self.host = host
+        self.port = port
         
         # 设置窗口大小和位置
         window_width = 600
@@ -27,8 +28,6 @@ class CarControlGUI:
         self.socket = None
         self.last_command_time = 0
         self.command_interval = 0.1  # 命令发送间隔（秒）
-        self.host = host
-        self.port = port
         
         # 创建界面元素
         self.create_widgets()
@@ -43,9 +42,10 @@ class CarControlGUI:
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def create_widgets(self):
+        """创建界面元素"""
         # 创建主框架
-        main_frame = ttk.Frame(self.root)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        main_frame = ttk.Frame(self.root, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
         
         # 连接控制区域
         connection_frame = ttk.LabelFrame(main_frame, text="连接控制")
@@ -69,39 +69,43 @@ class CarControlGUI:
         speed_frame = ttk.LabelFrame(main_frame, text="速度控制")
         speed_frame.pack(fill=tk.X, pady=(0, 10))
         
+        # 添加速度显示标签
+        self.speed_label = ttk.Label(speed_frame, text=f"当前速度: {self.current_speed}%")
+        self.speed_label.pack(pady=(5, 0))
+        
+        # 速度滑块
         self.speed_scale = ttk.Scale(speed_frame, from_=0, to=100, 
-                                   orient=tk.HORIZONTAL,
-                                   command=self.on_speed_change)
+                                    orient=tk.HORIZONTAL,
+                                    command=self.on_speed_change)
         self.speed_scale.set(self.current_speed)
         self.speed_scale.pack(fill=tk.X, padx=5, pady=5)
         
-        self.speed_label = ttk.Label(speed_frame, text=f"当前速度: {self.current_speed}%")
-        self.speed_label.pack(pady=(0, 5))
-        
         # 方向控制区域
         control_frame = ttk.LabelFrame(main_frame, text="方向控制")
-        control_frame.pack(fill=tk.BOTH, expand=True)
+        control_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
         
         # 使用网格布局创建方向控制按钮
         button_frame = ttk.Frame(control_frame)
         button_frame.pack(expand=True)
         
-        # 创建并配置按钮
+        # 创建控制按钮
         self.create_control_buttons(button_frame)
         
         # 日志区域
-        log_frame = ttk.Frame(main_frame)
-        log_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
+        log_frame = ttk.LabelFrame(main_frame, text="运行日志")
+        log_frame.pack(fill=tk.BOTH, expand=True)
         
         self.log_text = tk.Text(log_frame, height=6, wrap=tk.WORD)
-        self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         scrollbar = ttk.Scrollbar(log_frame, orient=tk.VERTICAL, 
                                 command=self.log_text.yview)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y, pady=5)
         self.log_text.config(yscrollcommand=scrollbar.set)
 
     def create_control_buttons(self, frame):
+        """创建方向控制按钮"""
+        # 按钮配置：(名称, 文本, 行, 列, 命令)
         button_config = [
             ('up_button', '前进', 0, 1, self.move_forward),
             ('left_button', '左转', 1, 0, self.turn_left),
@@ -110,8 +114,9 @@ class CarControlGUI:
             ('down_button', '后退', 2, 1, self.move_backward)
         ]
         
+        # 创建按钮
         for name, text, row, col, command in button_config:
-            btn = ttk.Button(frame, text=text, command=command)
+            btn = ttk.Button(frame, text=text, command=command, width=10)
             btn.grid(row=row, column=col, padx=5, pady=5)
             setattr(self, name, btn)
 
@@ -167,8 +172,12 @@ class CarControlGUI:
             self.stop()
 
     def on_speed_change(self, value):
-        self.current_speed = int(float(value))
-        self.speed_label.configure(text=f"当前速度: {self.current_speed}%")
+        """处理速度变化"""
+        try:
+            self.current_speed = int(float(value))
+            self.speed_label.configure(text=f"当前速度: {self.current_speed}%")
+        except Exception as e:
+            self.logger.error(f"更新速度显示失败: {e}")
 
     def toggle_connection(self):
         if not self.connected:

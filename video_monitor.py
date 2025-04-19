@@ -13,10 +13,11 @@ import struct
 import pickle
 
 class VideoMonitor:
-    def __init__(self, host="192.168.1.100", port=5001):  # 视频使用5001端口
-        # 创建主窗口
-        self.root = tk.Tk()
-        self.root.title("智能小车 - 视频监控")
+    def __init__(self, root, host="192.168.1.100", port=5001):
+        # 使用传入的root窗口
+        self.root = root
+        self.host = host
+        self.port = port
         
         # 设置窗口大小和位置
         window_width = 800
@@ -27,9 +28,7 @@ class VideoMonitor:
         y = (screen_height - window_height) // 2
         self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
         
-        # 初始化变量
-        self.host = host
-        self.port = port
+        # 初始化其他变量
         self.camera_running = False
         self.frame_queue = Queue(maxsize=2)
         self.processing_frame = False

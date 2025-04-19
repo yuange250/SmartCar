@@ -1,16 +1,15 @@
 from video_monitor import VideoMonitor
 from car_control_gui import CarControlGUI
-import threading
 import tkinter as tk
 from tkinter import ttk
 import json
 import os
 
-class SmartCarGUI:
+class SmartCarApp:
     def __init__(self):
-        # 创建配置窗口
+        # 创建主窗口
         self.root = tk.Tk()
-        self.root.title("智能小车 - 配置")
+        self.root.title("智能小车控制系统")
         
         # 设置窗口大小和位置
         window_width = 300
@@ -26,6 +25,10 @@ class SmartCarGUI:
         
         # 创建配置界面
         self.create_widgets()
+        
+        # 存储窗口实例
+        self.video_window = None
+        self.control_window = None
 
     def create_widgets(self):
         # 创建主框架
@@ -54,8 +57,8 @@ class SmartCarGUI:
             if os.path.exists('config.json'):
                 with open('config.json', 'r') as f:
                     self.config = json.load(f)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"加载配置文件失败: {e}")
 
     def save_config(self):
         """保存配置文件"""
@@ -66,33 +69,68 @@ class SmartCarGUI:
             try:
                 with open('config.json', 'w') as f:
                     json.dump(config, f)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"保存配置文件失败: {e}")
+
+    def create_video_window(self):
+        """创建视频监控窗口"""
+        video_root = tk.Toplevel(self.root)
+        video_root.title("视频监控")
+        return VideoMonitor(video_root, host=self.ip_entry.get(), port=5001)
+
+    def create_control_window(self):
+        """创建控制面板窗口"""
+        control_root = tk.Toplevel(self.root)
+        control_root.title("控制面板")
+        return CarControlGUI(control_root, host=self.ip_entry.get(), port=5000)
 
     def start_program(self):
         """启动主程序"""
-        # 获取配置
-        host = self.ip_entry.get()
-        
         # 保存配置
         self.save_config()
         
-        # 关闭配置窗口
-        self.root.destroy()
+        # 创建视频监控窗口
+        self.video_window = self.create_video_window()
         
-        # 创建并启动视频监控窗口
-        video_monitor = VideoMonitor(host=host, port=5001)  # 视频使用5001端口
-        video_thread = threading.Thread(target=video_monitor.run)
-        video_thread.daemon = True
-        video_thread.start()
+        # 创建控制面板窗口
+        self.control_window = self.create_control_window()
         
-        # 创建并启动车辆控制窗口
-        car_control = CarControlGUI(host=host, port=5000)  # 控制使用5000端口
-        car_control.run()
+        # 隐藏配置窗口
+        self.root.withdraw()
+        
+        # 设置窗口关闭处理
+        self.video_window.root.protocol("WM_DELETE_WINDOW", self.on_video_window_close)
+        self.control_window.root.protocol("WM_DELETE_WINDOW", self.on_control_window_close)
+
+    def on_video_window_close(self):
+        """处理视频窗口关闭"""
+        if self.video_window:
+            self.video_window.cleanup()
+            self.video_window.root.destroy()
+            self.video_window = None
+        self.check_windows_status()
+
+    def on_control_window_close(self):
+        """处理控制窗口关闭"""
+        if self.control_window:
+            self.control_window.cleanup()
+            self.control_window.root.destroy()
+            self.control_window = None
+        self.check_windows_status()
+
+    def check_windows_status(self):
+        """检查窗口状态"""
+        if not self.video_window and not self.control_window:
+            # 所有窗口都关闭时，显示配置窗口
+            self.root.deiconify()
+
+    def run(self):
+        """运行应用程序"""
+        self.root.mainloop()
 
 def main():
-    app = SmartCarGUI()
-    app.root.mainloop()
+    app = SmartCarApp()
+    app.run()
 
 if __name__ == "__main__":
     main() 
