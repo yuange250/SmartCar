@@ -28,30 +28,6 @@ ENB = 12  # 电机B使能端
 SERVO_H = 15  # 水平舵机
 SERVO_V = 18  # 垂直舵机
 
-# 设置GPIO为输出模式
-GPIO.setup(IN1, GPIO.OUT)
-GPIO.setup(IN2, GPIO.OUT)
-GPIO.setup(IN3, GPIO.OUT)
-GPIO.setup(IN4, GPIO.OUT)
-GPIO.setup(ENA, GPIO.OUT)
-GPIO.setup(ENB, GPIO.OUT)
-
-# 设置舵机GPIO为输出模式
-GPIO.setup(SERVO_H, GPIO.OUT)
-GPIO.setup(SERVO_V, GPIO.OUT)
-
-# 创建PWM对象
-pwm_a = GPIO.PWM(ENA, 100)  # 频率100Hz
-pwm_b = GPIO.PWM(ENB, 100)  # 频率100Hz
-pwm_h = GPIO.PWM(SERVO_H, 50)
-pwm_v = GPIO.PWM(SERVO_V, 50)
-
-# 启动PWM
-pwm_a.start(0)
-pwm_b.start(0)
-pwm_h.start(0)
-pwm_v.start(0)
-
 # 全局变量
 current_speed = 50
 current_h_angle = 90
