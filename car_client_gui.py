@@ -438,6 +438,9 @@ class CarClientGUI:
                     # 使用after方法在主线程中更新UI
                     self.root.after(0, lambda p=photo: self.update_video_frame(p))
                     
+                    # 添加短暂延迟，与服务器端帧率同步
+                    time.sleep(0.05)
+                    
             except socket.timeout:
                 continue
             except Exception as e:

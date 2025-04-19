@@ -120,12 +120,77 @@ def camera_stream_thread(client_socket):
 
 def start_camera_stream(client_socket):
     """启动摄像头流"""
-    global camera_running, camera_thread
-    if not camera_running:
+    global camera, camera_running, camera_thread
+    
+    if camera_running:
+        return "摄像头已经在运行"
+    
+    try:
+        # 初始化摄像头
+        camera = cv2.VideoCapture(0)
+        if not camera.isOpened():
+            return "无法打开摄像头"
+        
+        # 设置摄像头分辨率
+        camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        
+        # 设置摄像头帧率
+        camera.set(cv2.CAP_PROP_FPS, 15)  # 降低帧率到15fps
+        
         camera_running = True
-        camera_thread = threading.Thread(target=camera_stream_thread, args=(client_socket,))
+        camera_thread = threading.Thread(target=lambda: send_video_stream(client_socket))
         camera_thread.daemon = True
         camera_thread.start()
+        return "摄像头已启动"
+    except Exception as e:
+        return f"启动摄像头失败: {e}"
+
+def send_video_stream(client_socket):
+    """发送视频流"""
+    global camera, camera_running
+    
+    try:
+        while camera_running:
+            with camera_lock:
+                if camera is None or not camera.isOpened():
+                    break
+                
+                # 读取一帧
+                ret, frame = camera.read()
+                if not ret:
+                    print("无法读取摄像头帧")
+                    time.sleep(0.1)  # 短暂等待后重试
+                    continue
+                
+                # 压缩图像
+                _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 40])  # 降低质量到40%
+                frame_data = buffer.tobytes()
+                
+                # 发送帧大小
+                size = len(frame_data)
+                try:
+                    # 使用struct打包大小信息
+                    size_data = struct.pack('>L', size)
+                    client_socket.sendall(size_data)
+                    
+                    # 短暂延迟，确保大小信息被完整接收
+                    time.sleep(0.01)
+                    
+                    # 发送帧数据
+                    client_socket.sendall(frame_data)
+                    
+                    # 控制帧率
+                    time.sleep(1/15)  # 限制为15fps
+                except socket.error as e:
+                    print(f"发送视频数据错误: {e}")
+                    break
+                
+    except Exception as e:
+        print(f"视频流错误: {e}")
+    finally:
+        camera_running = False
+        print("视频流已停止")
 
 def stop_camera_stream():
     """停止摄像头流"""
@@ -292,24 +357,7 @@ def handle_client(client_socket, addr):
                 current_v_angle = value
                 response['message'] = set_servo_v(value)
             elif action == 'start_camera':
-                if init_camera():
-                    response['message'] = "摄像头已启动"
-                    camera_running = True
-                    # 开始发送视频流
-                    while camera_running:
-                        with camera_lock:  # 使用锁保护摄像头访问
-                            if camera is None or not camera.isOpened():
-                                print("摄像头未就绪")
-                                break
-                            ret, frame = camera.read()
-                            if not ret:
-                                print("无法读取摄像头画面")
-                                break
-                            if not send_frame(client_socket, frame):
-                                break
-                        time.sleep(0.05)  # 控制帧率
-                else:
-                    response['message'] = "摄像头启动失败"
+                response['message'] = start_camera_stream(client_socket)
             elif action == 'stop_camera':
                 response['message'] = "摄像头已停止"
                 camera_running = False
