@@ -336,6 +336,9 @@ def handle_client(client_socket, addr):
             action = command.get('action', '')
             value = command.get('value', 50)
             
+            # 记录接收到的命令
+            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 收到命令 - 客户端: {addr}, 动作: {action}, 值: {value}")
+            
             response = {'message': '', 'current_speed': current_speed, 
                        'current_h_angle': current_h_angle, 'current_v_angle': current_v_angle}
             
@@ -372,11 +375,14 @@ def handle_client(client_socket, addr):
             elif action == 'ping':
                 response['message'] = "pong"
             
+            # 记录命令执行结果
+            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 执行结果 - 客户端: {addr}, 响应: {response['message']}")
+            
             # 发送响应
             client_socket.send(json.dumps(response).encode('utf-8'))
             
     except Exception as e:
-        print(f"处理客户端 {addr} 错误: {e}")
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 处理客户端 {addr} 错误: {e}")
     finally:
         camera_running = False
         with camera_lock:  # 使用锁保护摄像头释放
@@ -384,7 +390,7 @@ def handle_client(client_socket, addr):
                 camera.release()
                 camera = None
         client_socket.close()
-        print(f"客户端 {addr} 已断开")
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 客户端 {addr} 已断开")
 
 def cleanup():
     """清理资源"""
