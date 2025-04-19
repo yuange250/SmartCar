@@ -4,6 +4,14 @@ import json
 import keyboard
 import time
 import sys
+import tkinter as tk
+from tkinter import ttk
+import struct
+import cv2
+import numpy as np
+from PIL import Image, ImageTk
+import threading
+import tkinter.messagebox as messagebox
 
 class CarClient:
     def __init__(self, host, port):
@@ -57,6 +65,265 @@ class CarClient:
         if self.socket:
             self.socket.close()
         self.connected = False
+
+class CarControlGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("智能小车控制系统")
+        self.root.geometry("1200x800")
+        self.root.configure(bg='#f0f0f0')
+        
+        # 设置样式
+        self.style = ttk.Style()
+        self.style.configure('TButton', padding=5, font=('Arial', 10))
+        self.style.configure('TLabel', font=('Arial', 10))
+        self.style.configure('TFrame', background='#f0f0f0')
+        
+        # 创建主框架
+        self.main_frame = ttk.Frame(root, padding="10")
+        self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # 创建左右分栏
+        self.left_frame = ttk.Frame(self.main_frame)
+        self.right_frame = ttk.Frame(self.main_frame)
+        self.left_frame.grid(row=0, column=0, padx=10, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.right_frame.grid(row=0, column=1, padx=10, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # 视频显示区域
+        self.video_frame = ttk.LabelFrame(self.left_frame, text="视频预览", padding="5")
+        self.video_frame.grid(row=0, column=0, columnspan=2, pady=5, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.video_label = ttk.Label(self.video_frame)
+        self.video_label.grid(row=0, column=0, padx=5, pady=5)
+        
+        # 连接控制区域
+        self.connection_frame = ttk.LabelFrame(self.left_frame, text="连接控制", padding="5")
+        self.connection_frame.grid(row=1, column=0, columnspan=2, pady=5, sticky=(tk.W, tk.E))
+        
+        # IP地址输入
+        ttk.Label(self.connection_frame, text="IP地址:").grid(row=0, column=0, padx=5, pady=5)
+        self.ip_entry = ttk.Entry(self.connection_frame, width=15)
+        self.ip_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.ip_entry.insert(0, "192.168.1.100")
+        
+        # 连接按钮
+        self.connect_button = ttk.Button(self.connection_frame, text="连接", command=self.toggle_connection)
+        self.connect_button.grid(row=0, column=2, padx=5, pady=5)
+        
+        # 状态标签
+        self.status_label = ttk.Label(self.connection_frame, text="未连接", foreground="red")
+        self.status_label.grid(row=0, column=3, padx=5, pady=5)
+        
+        # 运动控制区域
+        self.movement_frame = ttk.LabelFrame(self.right_frame, text="运动控制", padding="5")
+        self.movement_frame.grid(row=0, column=0, pady=5, sticky=(tk.W, tk.E))
+        
+        # 速度控制
+        self.speed_frame = ttk.Frame(self.movement_frame)
+        self.speed_frame.grid(row=0, column=0, columnspan=3, pady=5, sticky=(tk.W, tk.E))
+        ttk.Label(self.speed_frame, text="速度:").grid(row=0, column=0, padx=5)
+        self.speed_scale = ttk.Scale(self.speed_frame, from_=0, to=100, orient=tk.HORIZONTAL, length=200)
+        self.speed_scale.grid(row=0, column=1, padx=5)
+        self.speed_scale.set(50)
+        self.speed_label = ttk.Label(self.speed_frame, text="50%")
+        self.speed_label.grid(row=0, column=2, padx=5)
+        self.speed_scale.bind("<Motion>", self.update_speed_label)
+        self.speed_scale.bind("<ButtonRelease-1>", self.on_speed_change)
+        
+        # 方向控制按钮
+        button_frame = ttk.Frame(self.movement_frame)
+        button_frame.grid(row=1, column=0, columnspan=3, pady=5)
+        
+        self.forward_button = ttk.Button(button_frame, text="↑", width=5, command=self.forward)
+        self.forward_button.grid(row=0, column=1, padx=5, pady=5)
+        
+        self.left_button = ttk.Button(button_frame, text="←", width=5, command=self.turn_left)
+        self.left_button.grid(row=1, column=0, padx=5, pady=5)
+        
+        self.stop_button = ttk.Button(button_frame, text="■", width=5, command=self.stop)
+        self.stop_button.grid(row=1, column=1, padx=5, pady=5)
+        
+        self.right_button = ttk.Button(button_frame, text="→", width=5, command=self.turn_right)
+        self.right_button.grid(row=1, column=2, padx=5, pady=5)
+        
+        self.backward_button = ttk.Button(button_frame, text="↓", width=5, command=self.backward)
+        self.backward_button.grid(row=2, column=1, padx=5, pady=5)
+        
+        # 舵机控制区域
+        self.servo_frame = ttk.LabelFrame(self.right_frame, text="舵机控制", padding="5")
+        self.servo_frame.grid(row=1, column=0, pady=5, sticky=(tk.W, tk.E))
+        
+        # 水平舵机控制
+        h_frame = ttk.Frame(self.servo_frame)
+        h_frame.grid(row=0, column=0, pady=5, sticky=(tk.W, tk.E))
+        ttk.Label(h_frame, text="水平:").grid(row=0, column=0, padx=5)
+        self.h_scale = ttk.Scale(h_frame, from_=0, to=180, orient=tk.HORIZONTAL, length=200)
+        self.h_scale.grid(row=0, column=1, padx=5)
+        self.h_scale.set(90)
+        self.h_label = ttk.Label(h_frame, text="90°")
+        self.h_label.grid(row=0, column=2, padx=5)
+        self.h_scale.bind("<Motion>", self.update_h_label)
+        self.h_scale.bind("<ButtonRelease-1>", self.on_h_change)
+        
+        # 垂直舵机控制
+        v_frame = ttk.Frame(self.servo_frame)
+        v_frame.grid(row=1, column=0, pady=5, sticky=(tk.W, tk.E))
+        ttk.Label(v_frame, text="垂直:").grid(row=0, column=0, padx=5)
+        self.v_scale = ttk.Scale(v_frame, from_=0, to=180, orient=tk.HORIZONTAL, length=200)
+        self.v_scale.grid(row=0, column=1, padx=5)
+        self.v_scale.set(90)
+        self.v_label = ttk.Label(v_frame, text="90°")
+        self.v_label.grid(row=0, column=2, padx=5)
+        self.v_scale.bind("<Motion>", self.update_v_label)
+        self.v_scale.bind("<ButtonRelease-1>", self.on_v_change)
+        
+        # 摄像头控制区域
+        self.camera_frame = ttk.LabelFrame(self.right_frame, text="摄像头控制", padding="5")
+        self.camera_frame.grid(row=2, column=0, pady=5, sticky=(tk.W, tk.E))
+        
+        self.start_camera_button = ttk.Button(self.camera_frame, text="开启摄像头", command=self.start_camera)
+        self.start_camera_button.grid(row=0, column=0, padx=5, pady=5)
+        
+        self.stop_camera_button = ttk.Button(self.camera_frame, text="关闭摄像头", command=self.stop_camera)
+        self.stop_camera_button.grid(row=0, column=1, padx=5, pady=5)
+        
+        # 配置网格权重
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
+        self.main_frame.columnconfigure(1, weight=1)
+        self.main_frame.rowconfigure(0, weight=1)
+        self.left_frame.columnconfigure(0, weight=1)
+        self.left_frame.rowconfigure(0, weight=1)
+        self.right_frame.columnconfigure(0, weight=1)
+        
+        # 初始化变量
+        self.client_socket = None
+        self.is_connected = False
+        self.video_thread = None
+        self.video_running = False
+        
+        # 绑定键盘事件
+        self.root.bind('<Key>', self.on_key_press)
+        self.root.bind('<KeyRelease>', self.on_key_release)
+        
+        # 设置定时器，每秒发送一次ping
+        self.root.after(1000, self.send_ping)
+
+    def receive_video_stream(self):
+        """接收视频流"""
+        try:
+            while self.video_running:
+                try:
+                    # 接收帧大小（4字节）
+                    size_data = self.client_socket.recv(4)
+                    if not size_data:
+                        print("连接已断开")
+                        break
+                    
+                    # 解析帧大小
+                    size = struct.unpack('>L', size_data)[0]
+                    
+                    # 检查帧大小是否合理
+                    if size <= 0 or size > 1000000:  # 设置最大帧大小为1MB
+                        print(f"收到无效的帧大小: {size}")
+                        continue
+                    
+                    # 接收帧数据
+                    frame_data = b''
+                    remaining = size
+                    while remaining > 0:
+                        chunk = self.client_socket.recv(min(remaining, 8192))
+                        if not chunk:
+                            print("连接已断开")
+                            break
+                        frame_data += chunk
+                        remaining -= len(chunk)
+                    
+                    if len(frame_data) != size:
+                        print(f"帧数据大小不匹配: 预期 {size}, 实际 {len(frame_data)}")
+                        continue
+                    
+                    # 解码图像
+                    try:
+                        frame = cv2.imdecode(np.frombuffer(frame_data, dtype=np.uint8), cv2.IMREAD_COLOR)
+                        if frame is None:
+                            print("无法解码图像")
+                            continue
+                        
+                        # 调整图像大小以适应显示区域
+                        frame = cv2.resize(frame, (640, 480))
+                        
+                        # 转换为PIL图像
+                        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        frame = Image.fromarray(frame)
+                        
+                        # 转换为PhotoImage并显示
+                        photo = ImageTk.PhotoImage(image=frame)
+                        self.video_label.configure(image=photo)
+                        self.video_label.image = photo
+                        
+                    except Exception as e:
+                        print(f"处理图像时出错: {e}")
+                        continue
+                    
+                except socket.timeout:
+                    print("接收视频数据超时")
+                    continue
+                except struct.error as e:
+                    print(f"解析帧大小时出错: {e}")
+                    continue
+                except Exception as e:
+                    print(f"接收视频流时出错: {e}")
+                    continue
+                
+        except Exception as e:
+            print(f"视频流线程错误: {e}")
+        finally:
+            self.video_running = False
+            print("视频流已停止")
+
+    def start_camera(self):
+        """开启摄像头"""
+        if not self.is_connected:
+            messagebox.showerror("错误", "请先连接到服务器")
+            return
+        
+        try:
+            # 发送开启摄像头命令
+            response = self.client.send_command({'action': 'start_camera'})
+            if response and response.get('message') == "摄像头已启动":
+                self.video_running = True
+                self.video_thread = threading.Thread(target=self.receive_video_stream)
+                self.video_thread.daemon = True
+                self.video_thread.start()
+                self.start_camera_button.state(['disabled'])
+                self.stop_camera_button.state(['!disabled'])
+            else:
+                messagebox.showerror("错误", "无法启动摄像头")
+        except Exception as e:
+            messagebox.showerror("错误", f"启动摄像头失败: {e}")
+
+    def stop_camera(self):
+        """关闭摄像头"""
+        if not self.is_connected:
+            return
+        
+        try:
+            # 停止视频流
+            self.video_running = False
+            if self.video_thread:
+                self.video_thread.join(timeout=1.0)
+            
+            # 发送关闭摄像头命令
+            response = self.client.send_command({'action': 'stop_camera'})
+            if response and response.get('message') == "摄像头已停止":
+                self.start_camera_button.state(['!disabled'])
+                self.stop_camera_button.state(['disabled'])
+                # 清除视频显示
+                self.video_label.configure(image='')
+            else:
+                messagebox.showerror("错误", "无法关闭摄像头")
+        except Exception as e:
+            messagebox.showerror("错误", f"关闭摄像头失败: {e}")
 
 def main():
     # 获取服务器IP地址
