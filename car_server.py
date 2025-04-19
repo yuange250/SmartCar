@@ -62,6 +62,12 @@ class CarServer:
         self.video_running = False
         self.video_thread = None
 
+        # 舵机相关引脚和参数
+        self.PIN_SERVO_HORIZONTAL = SERVO_H  # 水平舵机
+        self.PIN_SERVO_VERTICAL = SERVO_V    # 垂直舵机
+        self.servo_h_angle = 90         # 水平舵机初始角度
+        self.servo_v_angle = 90         # 垂直舵机初始角度
+
     def setup_camera(self):
         """初始化相机"""
         try:
@@ -273,6 +279,24 @@ class CarServer:
         self.pwm_b.start(0)
         self.pwm_h.start(0)
         self.pwm_v.start(0)
+
+        # 设置舵机引脚
+        GPIO.setup(self.PIN_SERVO_HORIZONTAL, GPIO.OUT)
+        GPIO.setup(self.PIN_SERVO_VERTICAL, GPIO.OUT)
+        
+        # 初始化舵机PWM
+        self.servo_h = GPIO.PWM(self.PIN_SERVO_HORIZONTAL, 50)  # 50Hz
+        self.servo_v = GPIO.PWM(self.PIN_SERVO_VERTICAL, 50)    # 50Hz
+        
+        # 启动舵机PWM
+        self.servo_h.start(0)
+        self.servo_v.start(0)
+        
+        # 设置舵机初始位置
+        self.set_servo_angle('h', self.servo_h_angle)
+        self.set_servo_angle('v', self.servo_v_angle)
+        
+        print("舵机初始化完成")
 
     def cleanup_gpio(self):
         """清理GPIO"""
@@ -572,47 +596,50 @@ class CarServer:
                 # 接收数据
                 data = client_socket.recv(1024)
                 if not data:
-                    print(f"客户端 {address} 断开连接")
                     break
-                
-                # 打印原始数据
-                print(f"收到原始数据: {data}")
                 
                 # 解析命令
                 try:
-                    command = json.loads(data.decode('utf-8'))
-                    print(f"解析后的命令: {command}")
+                    command = json.loads(data.decode())
+                    print(f"收到命令: {command}")
                     
-                    # 提取命令和速度
+                    # 提取命令和参数
                     cmd = command.get('command', '')
                     speed = command.get('speed', 50)
                     
-                    # 忽略心跳包
-                    if cmd == 'heartbeat':
-                        print("收到心跳包")
-                        continue
+                    # 舵机控制命令
+                    if cmd == 'servo':
+                        servo_type = command.get('type', '')  # 'h' 或 'v'
+                        angle = command.get('angle', 90)      # 角度值
+                        print(f"舵机控制: 类型={servo_type}, 角度={angle}")
+                        self.set_servo_angle(servo_type, angle)
                     
-                    print(f"执行命令: {cmd}, 速度: {speed}")
-                    
-                    # 执行相应的动作
-                    if cmd == 'forward':
+                    # 其他命令处理
+                    elif cmd == 'forward':
+                        print(f"执行前进命令，速度：{speed}")
                         self.move_forward(speed)
                     elif cmd == 'backward':
+                        print(f"执行后退命令，速度：{speed}")
                         self.move_backward(speed)
                     elif cmd == 'left':
+                        print(f"执行左转命令，速度：{speed}")
                         self.turn_left(speed)
                     elif cmd == 'right':
+                        print(f"执行右转命令，速度：{speed}")
                         self.turn_right(speed)
                     elif cmd == 'stop':
+                        print("执行停止命令")
                         self.stop_motors()
+                    elif cmd == 'heartbeat':
+                        pass  # 忽略心跳包
                     else:
                         print(f"未知命令: {cmd}")
                     
                 except json.JSONDecodeError as e:
-                    print(f"JSON解析错误: {e}, 数据: {data.decode('utf-8', errors='ignore')}")
+                    print(f"JSON解析错误: {e}")
                 except Exception as e:
                     print(f"处理命令时出错: {e}")
-                
+                    
             except Exception as e:
                 print(f"接收数据时出错: {e}")
                 break
@@ -746,6 +773,42 @@ class CarServer:
             
         except Exception as e:
             print(f"停止电机失败: {e}")
+
+    def set_servo_angle(self, servo_type, angle):
+        """设置舵机角度
+        
+        Args:
+            servo_type: 'h' 水平舵机, 'v' 垂直舵机
+            angle: 角度 (0-180)
+        """
+        try:
+            # 确保角度在有效范围内
+            angle = max(0, min(180, angle))
+            
+            # 将角度转换为占空比 (0.5ms-2.5ms)
+            duty = 2.5 + angle * 10 / 180
+            
+            # 设置PWM占空比
+            if servo_type == 'h':
+                self.servo_h.ChangeDutyCycle(duty)
+                self.servo_h_angle = angle
+                print(f"设置水平舵机角度: {angle}°")
+            elif servo_type == 'v':
+                self.servo_v.ChangeDutyCycle(duty)
+                self.servo_v_angle = angle
+                print(f"设置垂直舵机角度: {angle}°")
+            
+            # 等待舵机转动
+            time.sleep(0.1)
+            
+            # 停止PWM输出，防止抖动
+            if servo_type == 'h':
+                self.servo_h.ChangeDutyCycle(0)
+            else:
+                self.servo_v.ChangeDutyCycle(0)
+                
+        except Exception as e:
+            print(f"设置舵机角度失败: {e}")
 
 def main():
     server = CarServer()

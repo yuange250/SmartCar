@@ -14,8 +14,8 @@ class CarControlGUI:
         self.port = port
         
         # 设置窗口大小和位置
-        window_width = 600
-        window_height = 400
+        window_width = 800  # 增加宽度
+        window_height = 600  # 增加高度
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         x = (screen_width - window_width) // 2
@@ -47,8 +47,12 @@ class CarControlGUI:
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
+        # 左侧控制面板
+        left_frame = ttk.Frame(main_frame)
+        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+        
         # 连接控制区域
-        connection_frame = ttk.LabelFrame(main_frame, text="连接控制")
+        connection_frame = ttk.LabelFrame(left_frame, text="连接控制")
         connection_frame.pack(fill=tk.X, pady=(0, 10))
         
         ttk.Label(connection_frame, text="IP地址:").pack(side=tk.LEFT, padx=5)
@@ -65,35 +69,60 @@ class CarControlGUI:
                                        command=self.toggle_connection)
         self.connect_button.pack(side=tk.LEFT, padx=5)
         
+        # 摄像头控制区域 - 移到速度控制之前
+        camera_control_frame = ttk.LabelFrame(left_frame, text="摄像头控制")
+        camera_control_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # 水平控制
+        h_frame = ttk.Frame(camera_control_frame)
+        h_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Label(h_frame, text="水平角度:").pack(side=tk.LEFT)
+        self.h_scale = ttk.Scale(h_frame, from_=0, to=180, orient=tk.HORIZONTAL,
+                                command=lambda v: self.on_servo_change('h', v))
+        self.h_scale.set(90)
+        self.h_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        # 垂直控制
+        v_frame = ttk.Frame(camera_control_frame)
+        v_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Label(v_frame, text="垂直角度:").pack(side=tk.LEFT)
+        self.v_scale = ttk.Scale(v_frame, from_=0, to=180, orient=tk.HORIZONTAL,
+                                command=lambda v: self.on_servo_change('v', v))
+        self.v_scale.set(90)
+        self.v_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        # 添加复位按钮
+        ttk.Button(camera_control_frame, text="复位摄像头",
+                   command=self.reset_camera).pack(pady=5)
+        
         # 速度控制区域
-        speed_frame = ttk.LabelFrame(main_frame, text="速度控制")
+        speed_frame = ttk.LabelFrame(left_frame, text="速度控制")
         speed_frame.pack(fill=tk.X, pady=(0, 10))
         
-        # 添加速度显示标签
-        self.speed_label = ttk.Label(speed_frame, text=f"当前速度: {self.current_speed}%")
+        self.speed_label = ttk.Label(speed_frame, 
+                                   text=f"当前速度: {self.current_speed}%")
         self.speed_label.pack(pady=(5, 0))
         
-        # 速度滑块
         self.speed_scale = ttk.Scale(speed_frame, from_=0, to=100, 
-                                    orient=tk.HORIZONTAL,
-                                    command=self.on_speed_change)
+                                   orient=tk.HORIZONTAL,
+                                   command=self.on_speed_change)
         self.speed_scale.set(self.current_speed)
         self.speed_scale.pack(fill=tk.X, padx=5, pady=5)
         
         # 方向控制区域
-        control_frame = ttk.LabelFrame(main_frame, text="方向控制")
+        control_frame = ttk.LabelFrame(left_frame, text="方向控制")
         control_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
         
         # 使用网格布局创建方向控制按钮
         button_frame = ttk.Frame(control_frame)
         button_frame.pack(expand=True)
-        
-        # 创建控制按钮
         self.create_control_buttons(button_frame)
         
-        # 日志区域
+        # 右侧日志区域
         log_frame = ttk.LabelFrame(main_frame, text="运行日志")
-        log_frame.pack(fill=tk.BOTH, expand=True)
+        log_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
         
         self.log_text = tk.Text(log_frame, height=6, wrap=tk.WORD)
         self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
@@ -116,8 +145,8 @@ class CarControlGUI:
         
         # 创建按钮
         for name, text, row, col, command in button_config:
-            btn = ttk.Button(frame, text=text, command=command, width=10)
-            btn.grid(row=row, column=col, padx=5, pady=5)
+            btn = ttk.Button(frame, text=text, command=command, width=15)  # 增加按钮宽度
+            btn.grid(row=row, column=col, padx=10, pady=10)  # 增加按钮间距
             setattr(self, name, btn)
 
     def setup_logging(self):
@@ -377,6 +406,55 @@ class CarControlGUI:
             
         except Exception as e:
             print(f"清理资源时出错: {e}")
+
+    def on_servo_change(self, servo_type, value):
+        """处理舵机角度变化"""
+        try:
+            angle = int(float(value))
+            self.send_servo_command(servo_type, angle)
+        except Exception as e:
+            self.logger.error(f"设置舵机角度失败: {e}")
+
+    def send_servo_command(self, servo_type, angle):
+        """发送舵机控制命令"""
+        if not self.connected:
+            return
+        
+        try:
+            data = {
+                'command': 'servo',
+                'type': servo_type,
+                'angle': angle
+            }
+            self.logger.info(f"发送舵机命令: {data}")
+            self.send_command_raw(data)
+        except Exception as e:
+            self.logger.error(f"发送舵机命令失败: {e}")
+
+    def reset_camera(self):
+        """复位摄像头位置"""
+        try:
+            # 设置水平和垂直舵机到90度
+            self.h_scale.set(90)
+            self.v_scale.set(90)
+            self.send_servo_command('h', 90)
+            self.send_servo_command('v', 90)
+            self.logger.info("摄像头已复位")
+        except Exception as e:
+            self.logger.error(f"复位摄像头失败: {e}")
+
+    def send_command_raw(self, data):
+        """发送原始命令数据"""
+        if not self.connected or not self.socket:
+            return
+            
+        try:
+            # 转换为JSON并发送
+            json_data = json.dumps(data)
+            self.socket.sendall(json_data.encode('utf-8'))
+        except Exception as e:
+            self.logger.error(f"发送命令失败: {e}")
+            self.disconnect()
 
     def run(self):
         self.root.mainloop() 
