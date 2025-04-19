@@ -60,9 +60,19 @@ class VideoMonitor:
             self.cleanup()
 
     def create_widgets(self):
-        # ... 现有的代码 ...
+        """创建界面元素"""
+        # 创建主框架
+        main_frame = ttk.Frame(self.root, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # 在控制按钮区域添加IP配置
+        # 视频显示区域
+        self.video_frame = ttk.Frame(main_frame)
+        self.video_frame.pack(fill=tk.BOTH, expand=True)
+        
+        self.video_label = ttk.Label(self.video_frame, background='black')
+        self.video_label.pack(fill=tk.BOTH, expand=True)
+        
+        # 控制区域
         control_frame = ttk.Frame(main_frame)
         control_frame.pack(fill=tk.X, pady=(10, 0))
         
@@ -95,6 +105,18 @@ class VideoMonitor:
         # FPS显示
         self.fps_label = ttk.Label(button_frame, text="FPS: 0")
         self.fps_label.pack(side=tk.LEFT, padx=5)
+        
+        # 日志区域
+        log_frame = ttk.Frame(main_frame)
+        log_frame.pack(fill=tk.BOTH, pady=(10, 0))
+        
+        self.log_text = tk.Text(log_frame, height=5, wrap=tk.WORD)
+        self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        scrollbar = ttk.Scrollbar(log_frame, orient=tk.VERTICAL, 
+                                command=self.log_text.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.log_text.config(yscrollcommand=scrollbar.set)
 
     def connect_to_video_stream(self):
         """连接到视频流"""
@@ -169,13 +191,32 @@ class VideoMonitor:
         if hasattr(self, 'root'):
             self.root.destroy()
 
+    def toggle_camera(self):
+        """切换摄像头状态"""
+        if not self.camera_running:
+            self.start_camera()
+        else:
+            self.stop_camera()
+
+    def start_camera(self):
+        """启动摄像头"""
+        if not self.camera_running:
+            try:
+                self.camera_running = True
+                self.camera_button.configure(text="关闭摄像头")
+                self.logger.info("正在连接视频流...")
+                self.connect_to_video_stream()
+            except Exception as e:
+                self.logger.error(f"启动摄像头失败: {e}")
+                self.stop_camera()
+
     def stop_camera(self):
         """停止摄像头"""
         if self.camera_running:
             self.camera_running = False
             
             # 关闭视频socket
-            if self.video_socket:
+            if hasattr(self, 'video_socket') and self.video_socket:
                 try:
                     self.video_socket.close()
                 except:
@@ -183,7 +224,7 @@ class VideoMonitor:
                 self.video_socket = None
             
             # 等待视频线程结束
-            if self.video_thread and self.video_thread.is_alive():
+            if hasattr(self, 'video_thread') and self.video_thread and self.video_thread.is_alive():
                 self.video_thread.join(timeout=1.0)
             
             # 清理资源
@@ -191,6 +232,183 @@ class VideoMonitor:
             self.camera_button.configure(text="开启摄像头")
             self.logger.info("已断开视频流连接")
 
+    def cleanup_video(self):
+        """清理视频相关资源"""
+        # 清空帧队列
+        while not self.frame_queue.empty():
+            try:
+                self.frame_queue.get_nowait()
+            except:
+                pass
+        
+        # 清理显示
+        self.video_label.configure(image='')
+        if hasattr(self.video_label, 'image'):
+            del self.video_label.image
+        self.fps_label.configure(text="FPS: 0")
+        
+        # 重置计数器
+        self.frame_count = 0
+        self.last_fps_update = time.time()
+        
+        # 强制垃圾回收
+        import gc
+        gc.collect()
+
+    def process_frame(self, frame):
+        """处理接收到的视频帧"""
+        try:
+            if self.frame_queue.full():
+                try:
+                    self.frame_queue.get_nowait()  # 丢弃旧帧
+                except:
+                    pass
+            
+            self.frame_queue.put_nowait(frame)
+            
+            if not self.processing_frame:
+                self.root.after_idle(self.process_next_frame)
+            
+        except Exception as e:
+            self.logger.error(f"处理视频帧错误: {e}")
+
+    def process_next_frame(self):
+        """处理队列中的下一帧"""
+        try:
+            if self.processing_frame:
+                return
+            
+            current_time = time.time()
+            if current_time - self.last_frame_time < self.frame_interval:
+                self.root.after(int((self.frame_interval - 
+                                   (current_time - self.last_frame_time)) * 1000), 
+                              self.process_next_frame)
+                return
+            
+            self.processing_frame = True
+            
+            try:
+                frame = self.frame_queue.get_nowait()
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                image = Image.fromarray(frame_rgb)
+                photo = ImageTk.PhotoImage(image=image)
+                
+                self.update_video_frame(photo)
+                
+                # 更新FPS计数
+                self.frame_count += 1
+                if current_time - self.last_fps_update >= self.fps_update_interval:
+                    fps = self.frame_count / (current_time - self.last_fps_update)
+                    self.fps_label.configure(text=f"FPS: {fps:.1f}")
+                    self.frame_count = 0
+                    self.last_fps_update = current_time
+                
+                del frame_rgb
+                image.close()
+                
+            except Exception as e:
+                self.logger.error(f"处理帧数据错误: {e}")
+            
+            self.last_frame_time = current_time
+            self.processing_frame = False
+            
+            if not self.frame_queue.empty():
+                self.root.after_idle(self.process_next_frame)
+            
+        except Exception as e:
+            self.logger.error(f"处理视频帧错误: {e}")
+            self.processing_frame = False
+
+    def update_video_frame(self, photo):
+        """更新视频显示"""
+        try:
+            old_photo = getattr(self.video_label, 'image', None)
+            self.video_label.configure(image=photo)
+            self.video_label.image = photo
+            if old_photo is not None:
+                del old_photo
+        except Exception as e:
+            self.logger.error(f"更新视频帧失败: {e}")
+
+    def take_snapshot(self):
+        """截图功能"""
+        if hasattr(self.video_label, 'image'):
+            # 创建screenshots目录（如果不存在）
+            if not os.path.exists('screenshots'):
+                os.makedirs('screenshots')
+            
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            filename = os.path.join('screenshots', f"snapshot_{timestamp}.png")
+            try:
+                # 保存当前帧
+                if hasattr(self.video_label, 'image'):
+                    # 将PhotoImage转换回PIL Image
+                    image = ImageTk.getimage(self.video_label.image)
+                    image.save(filename)
+                    self.logger.info(f"截图已保存: {filename}")
+            except Exception as e:
+                self.logger.error(f"保存截图失败: {e}")
+
     def on_closing(self):
         """窗口关闭处理"""
         self.cleanup()
+
+    def setup_logging(self):
+        """配置日志系统"""
+        # 创建自定义的日志处理器，将日志输出到文本框
+        class TextHandler(logging.Handler):
+            def __init__(self, text_widget):
+                super().__init__()
+                self.text_widget = text_widget
+
+            def emit(self, record):
+                msg = self.format(record)
+                def append():
+                    self.text_widget.insert(tk.END, msg + '\n')
+                    self.text_widget.see(tk.END)
+                    # 限制日志显示行数
+                    if float(self.text_widget.index('end')) > 1000:  # 超过1000行
+                        self.text_widget.delete('1.0', '100.0')  # 删除前100行
+                # 在主线程中更新GUI
+                self.text_widget.after(0, append)
+
+        try:
+            # 创建日志记录器
+            self.logger = logging.getLogger('VideoMonitor')
+            self.logger.setLevel(logging.INFO)
+            
+            # 清除可能存在的旧处理器
+            for handler in self.logger.handlers[:]:
+                self.logger.removeHandler(handler)
+            
+            # 创建文本处理器
+            text_handler = TextHandler(self.log_text)
+            
+            # 设置日志格式
+            formatter = logging.Formatter(
+                '%(asctime)s - %(levelname)s - %(message)s',
+                datefmt='%H:%M:%S'
+            )
+            text_handler.setFormatter(formatter)
+            
+            # 添加处理器到日志记录器
+            self.logger.addHandler(text_handler)
+            
+            # 添加文件处理器（可选）
+            if not os.path.exists('logs'):
+                os.makedirs('logs')
+            file_handler = logging.FileHandler(
+                os.path.join('logs', 'video_monitor.log'),
+                encoding='utf-8'
+            )
+            file_handler.setFormatter(formatter)
+            self.logger.addHandler(file_handler)
+            
+            self.logger.info("日志系统初始化完成")
+            
+        except Exception as e:
+            print(f"设置日志系统时出错: {e}")
+            # 创建基本的日志记录器
+            self.logger = logging.getLogger('VideoMonitor')
+            self.logger.setLevel(logging.INFO)
+            self.logger.addHandler(logging.StreamHandler())
