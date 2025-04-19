@@ -353,7 +353,7 @@ class CarClientGUI:
             try:
                 if not self.connected or self.socket is None:
                     print("连接已断开")
-                    break
+                    continue
                     
                 # 设置接收超时
                 self.socket.settimeout(1.0)
@@ -365,12 +365,12 @@ class CarClientGUI:
                         chunk = self.socket.recv(4 - len(size_data))
                         if not chunk:
                             print("连接已断开")
-                            break
+                            continue
                         size_data += chunk
                     
                     if len(size_data) != 4:
                         print("接收帧大小数据不完整")
-                        break
+                        continue
                         
                     size = struct.unpack('>L', size_data)[0]
                     if size > 100000:  # 限制最大帧大小
@@ -379,7 +379,7 @@ class CarClientGUI:
                     
                 except socket.error as e:
                     print(f"接收数据错误: {e}")
-                    break
+                    continue
                 
                 # 接收帧数据
                 frame_data = b''
@@ -428,7 +428,7 @@ class CarClientGUI:
                 continue
             except Exception as e:
                 print(f"接收视频错误: {e}")
-                break
+                continue
         
         self.camera_running = False
         self.root.after(0, lambda: self.camera_button.configure(text="开启摄像头"))
