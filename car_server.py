@@ -256,9 +256,9 @@ def backward():
 def turn_left():
     """小车左转"""
     if current_speed > 0:
-        GPIO.output(IN1, GPIO.LOW)
-        GPIO.output(IN2, GPIO.HIGH)
-        GPIO.output(IN3, GPIO.HIGH)
+        GPIO.output(IN1, GPIO.HIGH)
+        GPIO.output(IN2, GPIO.LOW)
+        GPIO.output(IN3, GPIO.LOW)
         GPIO.output(IN4, GPIO.LOW)
     else:
         stop()
@@ -267,10 +267,10 @@ def turn_left():
 def turn_right():
     """小车右转"""
     if current_speed > 0:
-        GPIO.output(IN1, GPIO.HIGH)
+        GPIO.output(IN1, GPIO.LOW)
         GPIO.output(IN2, GPIO.LOW)
-        GPIO.output(IN3, GPIO.LOW)
-        GPIO.output(IN4, GPIO.HIGH)
+        GPIO.output(IN3, GPIO.HIGH)
+        GPIO.output(IN4, GPIO.LOW)
     else:
         stop()
     return "右转"
