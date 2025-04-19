@@ -170,8 +170,6 @@ def forward():
         GPIO.output(IN2, GPIO.LOW)
         GPIO.output(IN3, GPIO.HIGH)
         GPIO.output(IN4, GPIO.LOW)
-        pwm_a.ChangeDutyCycle(current_speed)
-        pwm_b.ChangeDutyCycle(current_speed)
     else:
         stop()
     return "前进"
@@ -183,8 +181,6 @@ def backward():
         GPIO.output(IN2, GPIO.HIGH)
         GPIO.output(IN3, GPIO.LOW)
         GPIO.output(IN4, GPIO.HIGH)
-        pwm_a.ChangeDutyCycle(current_speed)
-        pwm_b.ChangeDutyCycle(current_speed)
     else:
         stop()
     return "后退"
@@ -196,8 +192,6 @@ def turn_left():
         GPIO.output(IN2, GPIO.HIGH)
         GPIO.output(IN3, GPIO.HIGH)
         GPIO.output(IN4, GPIO.LOW)
-        pwm_a.ChangeDutyCycle(current_speed)
-        pwm_b.ChangeDutyCycle(current_speed)
     else:
         stop()
     return "左转"
@@ -209,8 +203,6 @@ def turn_right():
         GPIO.output(IN2, GPIO.LOW)
         GPIO.output(IN3, GPIO.LOW)
         GPIO.output(IN4, GPIO.HIGH)
-        pwm_a.ChangeDutyCycle(current_speed)
-        pwm_b.ChangeDutyCycle(current_speed)
     else:
         stop()
     return "右转"

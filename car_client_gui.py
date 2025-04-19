@@ -265,10 +265,24 @@ class CarClientGUI:
 
     def on_speed_change(self, value):
         """速度改变时的回调"""
-        speed = int(float(value))
-        self.speed_label['text'] = f"{speed}%"
-        if self.connected:
-            self.send_command('speed', speed)
+        try:
+            speed = int(float(value))
+            # 确保速度在有效范围内
+            speed = max(0, min(100, speed))
+            
+            # 更新UI
+            self.speed_label['text'] = f"{speed}%"
+            
+            # 只有在连接状态且速度真正改变时才发送命令
+            if self.connected and speed != self.current_speed:
+                self.current_speed = speed
+                self.send_command('speed', speed)
+                self.log(f"设置速度: {speed}%")
+        except Exception as e:
+            self.log(f"设置速度失败: {e}")
+            # 恢复之前的速度值
+            self.speed_var.set(self.current_speed)
+            self.speed_label['text'] = f"{self.current_speed}%"
 
     def on_key_press(self, event):
         """键盘按下事件"""
