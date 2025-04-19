@@ -60,6 +60,8 @@ def init_camera():
     """初始化摄像头"""
     global camera
     try:
+        if camera is not None:
+            camera.release()
         camera = cv2.VideoCapture(0)  # 使用默认摄像头
         if not camera.isOpened():
             print("无法打开摄像头")
@@ -270,17 +272,27 @@ def handle_client(client_socket, addr):
                 current_v_angle = value
                 response['message'] = set_servo_v(value)
             elif action == 'start_camera':
-                response['message'] = "摄像头已启动"
-                # 开始发送视频流
-                while True:
-                    ret, frame = camera.read()
-                    if not ret:
-                        break
-                    if not send_frame(client_socket, frame):
-                        break
-                    time.sleep(0.05)  # 控制帧率
+                if init_camera():
+                    response['message'] = "摄像头已启动"
+                    # 开始发送视频流
+                    while True:
+                        if camera is None or not camera.isOpened():
+                            print("摄像头未就绪")
+                            break
+                        ret, frame = camera.read()
+                        if not ret:
+                            print("无法读取摄像头画面")
+                            break
+                        if not send_frame(client_socket, frame):
+                            break
+                        time.sleep(0.05)  # 控制帧率
+                else:
+                    response['message'] = "摄像头启动失败"
             elif action == 'stop_camera':
                 response['message'] = "摄像头已停止"
+                if camera is not None:
+                    camera.release()
+                    camera = None
                 break
             elif action == 'ping':
                 response['message'] = "pong"
@@ -291,8 +303,9 @@ def handle_client(client_socket, addr):
     except Exception as e:
         print(f"处理客户端 {addr} 错误: {e}")
     finally:
-        stop_camera_stream()
-        release_camera()
+        if camera is not None:
+            camera.release()
+            camera = None
         client_socket.close()
         print(f"客户端 {addr} 已断开")
 
