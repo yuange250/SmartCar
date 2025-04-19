@@ -157,7 +157,6 @@ def send_video_stream(client_socket):
                     
                     # 发送帧数据
                     client_socket.sendall(frame_data)
-                    print(f"发送视频帧")
 
                     # 控制帧率
                     time.sleep(1/15)  # 限制为15fps

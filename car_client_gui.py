@@ -364,6 +364,7 @@ class CarClientGUI:
 
     def receive_video(self):
         """接收视频流"""
+        self.log(f"接受视频流")
         while self.camera_running:
             self.log(f"接受到图像")
             try:
