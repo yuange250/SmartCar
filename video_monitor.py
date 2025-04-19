@@ -123,12 +123,16 @@ class VideoMonitor:
             self.host = self.ip_entry.get()
             self.port = int(self.port_entry.get())
             
-            # 创建视频接收线程
+            # 创建socket连接
+            self.video_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.video_socket.connect((self.host, self.port))
+            
+            # 启动视频接收线程
             self.video_thread = threading.Thread(target=self.receive_video)
             self.video_thread.daemon = True
             self.video_thread.start()
             
-            self.logger.info(f"正在连接视频流 {self.host}:{self.port}")
+            self.logger.info(f"已连接到视频流 {self.host}:{self.port}")
             
         except Exception as e:
             self.logger.error(f"连接视频流失败: {e}")
@@ -137,48 +141,50 @@ class VideoMonitor:
     def receive_video(self):
         """接收视频流"""
         try:
-            # 创建socket连接
-            self.video_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.video_socket.connect((self.host, self.port))
-            
-            # 接收视频数据
-            data = b""
-            payload_size = struct.calcsize("L")
-            
             while self.camera_running:
                 try:
                     # 接收帧大小
-                    while len(data) < payload_size:
-                        data += self.video_socket.recv(4096)
-                    
-                    packed_size = data[:payload_size]
-                    data = data[payload_size:]
-                    frame_size = struct.unpack("L", packed_size)[0]
+                    header = self.receive_all(4)
+                    if not header:
+                        break
+                    frame_size = struct.unpack('>L', header)[0]
                     
                     # 接收帧数据
-                    while len(data) < frame_size:
-                        data += self.video_socket.recv(4096)
+                    frame_data = self.receive_all(frame_size)
+                    if not frame_data:
+                        break
                     
-                    frame_data = data[:frame_size]
-                    data = data[frame_size:]
+                    # 解码图像
+                    frame = cv2.imdecode(
+                        np.frombuffer(frame_data, dtype=np.uint8),
+                        cv2.IMREAD_COLOR
+                    )
                     
-                    # 解码帧
-                    frame = pickle.loads(frame_data)
-                    
-                    # 处理帧
-                    self.process_frame(frame)
+                    if frame is not None:
+                        # 处理帧
+                        self.process_frame(frame)
                     
                 except Exception as e:
                     self.logger.error(f"接收视频数据错误: {e}")
                     break
-                    
+                
         except Exception as e:
-            self.logger.error(f"视频流连接错误: {e}")
+            self.logger.error(f"视频接收线程错误: {e}")
         finally:
             if self.video_socket:
                 self.video_socket.close()
             self.camera_running = False
             self.root.after(0, self.update_camera_button)
+
+    def receive_all(self, size):
+        """接收指定大小的数据"""
+        data = bytearray()
+        while len(data) < size:
+            packet = self.video_socket.recv(size - len(data))
+            if not packet:
+                return None
+            data.extend(packet)
+        return data
 
     def update_camera_button(self):
         """更新摄像头按钮状态"""
@@ -259,7 +265,7 @@ class VideoMonitor:
         try:
             if self.frame_queue.full():
                 try:
-                    self.frame_queue.get_nowait()  # 丢弃旧帧
+                    self.frame_queue.get_nowait()
                 except:
                     pass
             
@@ -288,10 +294,17 @@ class VideoMonitor:
             
             try:
                 frame = self.frame_queue.get_nowait()
+                
+                # 转换颜色空间
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                
+                # 转换为PIL图像
                 image = Image.fromarray(frame_rgb)
+                
+                # 创建PhotoImage
                 photo = ImageTk.PhotoImage(image=image)
                 
+                # 更新显示
                 self.update_video_frame(photo)
                 
                 # 更新FPS计数

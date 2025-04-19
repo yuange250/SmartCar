@@ -173,21 +173,21 @@ class CarServer:
                     continue
                 
                 # 压缩图像
-                encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 90]
-                _, frame_encoded = cv2.imencode('.jpg', frame, encode_param)
+                _, jpeg = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+                frame_data = jpeg.tobytes()
                 
-                # 准备数据
-                data = pickle.dumps(frame_encoded)
-                size = len(data)
+                # 构建帧头
+                frame_size = len(frame_data)
+                header = struct.pack('>L', frame_size)  # 使用大端序打包
                 
                 # 发送给所有客户端
                 disconnected_clients = []
                 for client in self.video_clients:
                     try:
-                        # 发送数据大小
-                        client.sendall(struct.pack("L", size))
-                        # 发送数据
-                        client.sendall(data)
+                        # 发送帧头
+                        client.sendall(header)
+                        # 发送帧数据
+                        client.sendall(frame_data)
                     except Exception as e:
                         print(f"发送视频帧失败: {e}")
                         disconnected_clients.append(client)
