@@ -292,44 +292,68 @@ class CarClientGUI:
     def start_camera(self):
         """启动摄像头"""
         if self.connected and not self.camera_running:
-            self.send_command('start_camera')
-            self.camera_running = True
-            self.camera_button['text'] = "关闭摄像头"
-            self.camera_thread = threading.Thread(target=self.receive_video)
-            self.camera_thread.daemon = True
-            self.camera_thread.start()
+            try:
+                self.send_command('start_camera')
+                self.camera_running = True
+                self.camera_button['text'] = "关闭摄像头"
+                self.camera_thread = threading.Thread(target=self.receive_video)
+                self.camera_thread.daemon = True
+                self.camera_thread.start()
+                self.log("摄像头已启动")
+            except Exception as e:
+                self.log(f"启动摄像头失败: {e}")
+                self.camera_running = False
+                self.camera_button['text'] = "开启摄像头"
 
     def stop_camera(self):
         """停止摄像头"""
         if self.connected and self.camera_running:
-            self.send_command('stop_camera')
-            self.camera_running = False
-            self.camera_button['text'] = "开启摄像头"
-            if self.camera_thread:
-                self.camera_thread.join(timeout=1.0)
-            self.video_label.configure(image='')
+            try:
+                self.send_command('stop_camera')
+                self.camera_running = False
+                self.camera_button['text'] = "开启摄像头"
+                if self.camera_thread:
+                    self.camera_thread.join(timeout=1.0)
+                self.video_label.configure(image='')
+                self.log("摄像头已停止")
+            except Exception as e:
+                self.log(f"停止摄像头失败: {e}")
 
     def receive_video(self):
         """接收视频流"""
         while self.camera_running:
             try:
+                # 设置接收超时
+                self.socket.settimeout(1.0)
+                
                 # 接收帧大小
                 size_data = self.socket.recv(4)
                 if not size_data:
+                    print("连接已断开")
                     break
+                    
                 size = struct.unpack('>L', size_data)[0]
+                if size > 1000000:  # 防止接收过大的数据
+                    print(f"帧大小异常: {size}")
+                    continue
                 
                 # 接收帧数据
                 frame_data = b''
-                while len(frame_data) < size:
-                    packet = self.socket.recv(size - len(frame_data))
+                remaining = size
+                while remaining > 0:
+                    packet = self.socket.recv(min(remaining, 8192))
                     if not packet:
                         break
                     frame_data += packet
+                    remaining -= len(packet)
                 
                 if len(frame_data) == size:
                     # 解码图像
                     frame = cv2.imdecode(np.frombuffer(frame_data, dtype=np.uint8), cv2.IMREAD_COLOR)
+                    if frame is None:
+                        print("图像解码失败")
+                        continue
+                        
                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     
                     # 调整大小以适应显示
@@ -348,16 +372,23 @@ class CarClientGUI:
                     image = Image.fromarray(frame)
                     photo = ImageTk.PhotoImage(image=image)
                     
-                    # 更新显示
-                    self.video_label.configure(image=photo)
-                    self.video_label.image = photo
+                    # 使用after方法在主线程中更新UI
+                    self.root.after(0, lambda p=photo: self.update_video_frame(p))
                     
+            except socket.timeout:
+                continue
             except Exception as e:
                 print(f"接收视频错误: {e}")
                 break
         
         self.camera_running = False
         self.root.after(0, lambda: self.camera_button.configure(text="开启摄像头"))
+
+    def update_video_frame(self, photo):
+        """在主线程中更新视频帧"""
+        if self.camera_running:
+            self.video_label.configure(image=photo)
+            self.video_label.image = photo  # 保持引用
 
     def log(self, message):
         """添加日志"""
