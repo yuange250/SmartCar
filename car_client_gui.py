@@ -360,18 +360,26 @@ class CarClientGUI:
                 
                 # 接收帧大小
                 try:
-                    size_data = self.socket.recv(4)
-                    if not size_data:
-                        print("连接已断开")
+                    size_data = b''
+                    while len(size_data) < 4:
+                        chunk = self.socket.recv(4 - len(size_data))
+                        if not chunk:
+                            print("连接已断开")
+                            break
+                        size_data += chunk
+                    
+                    if len(size_data) != 4:
+                        print("接收帧大小数据不完整")
                         break
+                        
+                    size = struct.unpack('>L', size_data)[0]
+                    if size > 100000:  # 限制最大帧大小
+                        print(f"帧大小异常: {size}")
+                        continue
+                    
                 except socket.error as e:
                     print(f"接收数据错误: {e}")
                     break
-                
-                size = struct.unpack('>L', size_data)[0]
-                if size > 100000:  # 限制最大帧大小
-                    print(f"帧大小异常: {size}")
-                    continue
                 
                 # 接收帧数据
                 frame_data = b''

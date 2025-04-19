@@ -20,8 +20,8 @@ IN1 = 9   # 控制端1
 IN2 = 25  # 控制端2
 IN3 = 11  # 控制端3
 IN4 = 8   # 控制端4
-ENA = 27  # 电机A使能端（从4改为27）
-ENB = 17  # 电机B使能端
+ENA = 6  # 电机A使能端（从4改为27）
+ENB = 12  # 电机B使能端
 
 # 定义舵机GPIO引脚
 SERVO_H = 15  # 水平舵机
@@ -247,6 +247,9 @@ def send_frame(client_socket, frame):
         # 发送帧大小（4字节）
         size_bytes = struct.pack('>L', size)
         client_socket.sendall(size_bytes)
+        
+        # 等待一小段时间确保大小数据被发送
+        time.sleep(0.001)
         
         # 发送帧数据
         client_socket.sendall(frame_data)
