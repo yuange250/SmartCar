@@ -186,22 +186,102 @@ class CarControlGUI:
             self.disconnect()
 
     def connect(self):
+        """连接到小车"""
         try:
-            ip = self.ip_entry.get()
+            # 获取IP和端口
+            host = self.ip_entry.get()
             port = int(self.port_entry.get())
             
+            # 创建socket连接
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.connect((ip, port))
+            self.socket.settimeout(5)  # 设置超时时间
             
+            self.logger.info(f"正在连接到 {host}:{port}")
+            self.socket.connect((host, port))
+            
+            # 连接成功
             self.connected = True
             self.connect_button.configure(text="断开")
-            self.logger.info(f"已连接到 {ip}:{port}")
+            self.logger.info(f"已连接到 {host}:{port}")
+            
+            # 启动心跳检测
+            self.start_heartbeat()
             
         except Exception as e:
             self.logger.error(f"连接失败: {e}")
             if self.socket:
                 self.socket.close()
                 self.socket = None
+            self.connected = False
+
+    def start_heartbeat(self):
+        """启动心跳检测"""
+        def heartbeat():
+            if self.connected and hasattr(self, 'socket') and self.socket:
+                try:
+                    # 发送心跳包
+                    self.send_command('heartbeat')
+                    # 每2秒发送一次心跳
+                    self.root.after(2000, heartbeat)
+                except:
+                    self.disconnect()
+        
+        # 启动第一次心跳
+        self.root.after(2000, heartbeat)
+
+    def send_command(self, command):
+        """发送控制命令"""
+        if not self.connected or not self.socket:
+            self.logger.error("未连接到服务器")
+            return
+            
+        try:
+            # 构建命令数据
+            data = {
+                'command': command,
+                'speed': self.current_speed
+            }
+            
+            # 转换为JSON并发送
+            json_data = json.dumps(data)
+            self.logger.info(f"发送命令: {json_data}")
+            
+            # 确保发送完整的数据
+            self.socket.sendall(json_data.encode('utf-8'))
+            
+        except Exception as e:
+            self.logger.error(f"发送命令失败: {e}")
+            self.disconnect()
+
+    def move_forward(self):
+        """前进"""
+        if self.connected:
+            self.logger.info("发送前进命令")
+            self.send_command('forward')
+
+    def move_backward(self):
+        """后退"""
+        if self.connected:
+            self.logger.info("发送后退命令")
+            self.send_command('backward')
+
+    def turn_left(self):
+        """左转"""
+        if self.connected:
+            self.logger.info("发送左转命令")
+            self.send_command('left')
+
+    def turn_right(self):
+        """右转"""
+        if self.connected:
+            self.logger.info("发送右转命令")
+            self.send_command('right')
+
+    def stop(self):
+        """停止"""
+        if self.connected:
+            self.logger.info("发送停止命令")
+            self.send_command('stop')
 
     def disconnect(self):
         """断开连接"""
@@ -213,7 +293,7 @@ class CarControlGUI:
                         self.send_command('stop')
                     except:
                         pass
-                    
+                
                 # 关闭socket
                 if self.socket:
                     try:
@@ -224,65 +304,12 @@ class CarControlGUI:
                 
                 self.connected = False
                 self.connect_button.configure(text="连接")
-                if hasattr(self, 'logger'):
-                    self.logger.info("已断开连接")
+                self.logger.info("已断开连接")
                 
             except Exception as e:
-                if hasattr(self, 'logger'):
-                    self.logger.error(f"断开连接时出错: {e}")
+                self.logger.error(f"断开连接时出错: {e}")
                 self.connected = False
                 self.connect_button.configure(text="连接")
-
-    def send_command(self, command):
-        """发送控制命令"""
-        if not self.connected or not self.socket:
-            return
-            
-        try:
-            # 构建命令数据
-            data = {
-                'command': command,
-                'speed': self.current_speed
-            }
-            
-            # 发送命令
-            self.socket.send(json.dumps(data).encode())
-            
-        except Exception as e:
-            if hasattr(self, 'logger'):
-                self.logger.error(f"发送命令失败: {e}")
-            self.disconnect()
-
-    def move_forward(self):
-        if self.connected:
-            self.send_command('forward')
-            self.logger.info("前进")
-
-    def move_backward(self):
-        if self.connected:
-            self.send_command('backward')
-            self.logger.info("后退")
-
-    def turn_left(self):
-        if self.connected:
-            self.send_command('left')
-            self.logger.info("左转")
-
-    def turn_right(self):
-        if self.connected:
-            self.send_command('right')
-            self.logger.info("右转")
-
-    def stop(self):
-        """停止所有运动"""
-        if self.connected:
-            try:
-                self.send_command('stop')
-                if hasattr(self, 'logger'):
-                    self.logger.info("停止")
-            except Exception as e:
-                if hasattr(self, 'logger'):
-                    self.logger.error(f"停止失败: {e}")
 
     def on_closing(self):
         """窗口关闭处理"""

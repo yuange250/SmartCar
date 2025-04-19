@@ -572,38 +572,44 @@ class CarServer:
                 # 接收数据
                 data = client_socket.recv(1024)
                 if not data:
+                    print(f"客户端 {address} 断开连接")
                     break
+                
+                # 打印原始数据
+                print(f"收到原始数据: {data}")
                 
                 # 解析命令
                 try:
-                    command = json.loads(data.decode())
-                    print(f"收到命令: {command}")  # 打印接收到的命令
+                    command = json.loads(data.decode('utf-8'))
+                    print(f"解析后的命令: {command}")
                     
                     # 提取命令和速度
                     cmd = command.get('command', '')
                     speed = command.get('speed', 50)
                     
+                    # 忽略心跳包
+                    if cmd == 'heartbeat':
+                        print("收到心跳包")
+                        continue
+                    
+                    print(f"执行命令: {cmd}, 速度: {speed}")
+                    
                     # 执行相应的动作
                     if cmd == 'forward':
-                        print(f"执行前进命令，速度：{speed}")
                         self.move_forward(speed)
                     elif cmd == 'backward':
-                        print(f"执行后退命令，速度：{speed}")
                         self.move_backward(speed)
                     elif cmd == 'left':
-                        print(f"执行左转命令，速度：{speed}")
                         self.turn_left(speed)
                     elif cmd == 'right':
-                        print(f"执行右转命令，速度：{speed}")
                         self.turn_right(speed)
                     elif cmd == 'stop':
-                        print("执行停止命令")
                         self.stop_motors()
                     else:
                         print(f"未知命令: {cmd}")
                     
                 except json.JSONDecodeError as e:
-                    print(f"JSON解析错误: {e}")
+                    print(f"JSON解析错误: {e}, 数据: {data.decode('utf-8', errors='ignore')}")
                 except Exception as e:
                     print(f"处理命令时出错: {e}")
                 
