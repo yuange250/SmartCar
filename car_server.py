@@ -90,14 +90,16 @@ class CarServer:
     def setup_camera(self):
         """初始化相机"""
         try:
-            self.camera = Picamera2()
-            # 配置相机
-            config = self.camera.create_video_configuration(
-                main={"size": (640, 480)},
-                controls={"FrameDurationLimits": (33333, 33333)}  # 30fps
-            )
-            self.camera.configure(config)
-            self.camera.start()
+            self.camera = cv2.VideoCapture(0)  # 使用默认摄像头
+            # 设置分辨率
+            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            # 设置帧率
+            self.camera.set(cv2.CAP_PROP_FPS, 30)
+            
+            if not self.camera.isOpened():
+                raise Exception("无法打开摄像头")
+                
             print("相机初始化成功")
         except Exception as e:
             print(f"相机初始化失败: {e}")
@@ -190,11 +192,10 @@ class CarServer:
                     continue
                 
                 # 捕获图像
-                frame = self.camera.capture_array()
-                
-                # 转换为BGR格式（如果需要）
-                if len(frame.shape) == 2:  # 如果是灰度图
-                    frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+                ret, frame = self.camera.read()
+                if not ret:
+                    print("读取视频帧失败")
+                    continue
                 
                 # 压缩图像
                 encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 90]
@@ -229,7 +230,7 @@ class CarServer:
                 
             except Exception as e:
                 print(f"视频流循环错误: {e}")
-                time.sleep(0.1)  # 防止错误时CPU占用过高
+                time.sleep(0.1)
 
     def stop(self):
         """停止服务器"""
@@ -260,10 +261,10 @@ class CarServer:
             except:
                 pass
         
-        # 停止相机
+        # 释放相机
         if self.camera:
             try:
-                self.camera.stop()
+                self.camera.release()
             except:
                 pass
         
