@@ -564,70 +564,61 @@ class CarServer:
             return False
         return True
 
-    def handle_client(self, client_socket, addr):
+    def handle_client(self, client_socket, address):
         """处理客户端连接"""
-        global current_speed, current_h_angle, current_v_angle, camera, camera_running
-        
-        print(f"客户端 {addr} 已连接")
-        
-        try:
-            while True:
-                # 接收命令
-                data = client_socket.recv(1024).decode('utf-8')
+        print(f"新的控制连接：{address}")
+        while self.running:
+            try:
+                # 接收数据
+                data = client_socket.recv(1024)
                 if not data:
                     break
+                
+                # 解析命令
+                try:
+                    command = json.loads(data.decode())
+                    print(f"收到命令: {command}")  # 打印接收到的命令
                     
-                command = json.loads(data)
-                action = command.get('action', '')
-                value = command.get('value', 50)
+                    # 提取命令和速度
+                    cmd = command.get('command', '')
+                    speed = command.get('speed', 50)
+                    
+                    # 执行相应的动作
+                    if cmd == 'forward':
+                        print(f"执行前进命令，速度：{speed}")
+                        self.move_forward(speed)
+                    elif cmd == 'backward':
+                        print(f"执行后退命令，速度：{speed}")
+                        self.move_backward(speed)
+                    elif cmd == 'left':
+                        print(f"执行左转命令，速度：{speed}")
+                        self.turn_left(speed)
+                    elif cmd == 'right':
+                        print(f"执行右转命令，速度：{speed}")
+                        self.turn_right(speed)
+                    elif cmd == 'stop':
+                        print("执行停止命令")
+                        self.stop_motors()
+                    else:
+                        print(f"未知命令: {cmd}")
+                    
+                except json.JSONDecodeError as e:
+                    print(f"JSON解析错误: {e}")
+                except Exception as e:
+                    print(f"处理命令时出错: {e}")
                 
-                # 记录接收到的命令
-                # print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 收到命令 - 客户端: {addr}, 动作: {action}, 值: {value}")
-                
-                response = {'message': '', 'current_speed': current_speed, 
-                           'current_h_angle': current_h_angle, 'current_v_angle': current_v_angle}
-                
-                # 处理命令
-                if action == 'forward':
-                    response['message'] = self.forward()
-                elif action == 'backward':
-                    response['message'] = self.backward()
-                elif action == 'left':
-                    response['message'] = self.turn_left()
-                elif action == 'right':
-                    response['message'] = self.turn_right()
-                elif action == 'stop':
-                    response['message'] = self.stop()
-                elif action == 'speed':
-                    current_speed = value
-                    response['message'] = self.set_speed(value)
-                elif action == 'servo_h':
-                    current_h_angle = value
-                    response['message'] = self.set_servo_h(value)
-                elif action == 'servo_v':
-                    current_v_angle = value
-                    response['message'] = self.set_servo_v(value)
-                elif action == 'start_camera':
-                    response['message'] = self.start_camera_stream(client_socket)
-                elif action == 'stop_camera':
-                    self.stop_camera_stream()
-                    response['message'] = "摄像头已停止"
-                    break
-                elif action == 'ping':
-                    response['message'] = "pong"
-                
-                # 记录命令执行结果
-                # print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 执行结果 - 客户端: {addr}, 响应: {response['message']}")
-                
-                # 发送响应
-                client_socket.send(json.dumps(response).encode('utf-8'))
-                
-        except Exception as e:
-            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 处理客户端 {addr} 错误: {e}")
-        finally:
-            self.stop_camera_stream()
+            except Exception as e:
+                print(f"接收数据时出错: {e}")
+                break
+        
+        # 关闭连接
+        try:
             client_socket.close()
-            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] 客户端 {addr} 已断开")
+        except:
+            pass
+        if client_socket in self.clients:
+            self.clients.remove(client_socket)
+        print(f"控制连接断开：{address}")
 
     def event_loop(self):
         """事件循环"""
@@ -651,8 +642,11 @@ class CarServer:
             right_speed: 右电机速度 (-100 到 100)
         """
         try:
+            print(f"设置电机速度: 左轮={left_speed}, 右轮={right_speed}")
+            
             # 左电机
             if left_speed >= 0:
+                print("左电机前进")
                 GPIO.output(IN1, GPIO.HIGH)
                 GPIO.output(IN2, GPIO.LOW)
                 GPIO.output(IN3, GPIO.HIGH)
@@ -660,6 +654,7 @@ class CarServer:
                 self.pwm_a.ChangeDutyCycle(abs(left_speed))
                 self.pwm_b.ChangeDutyCycle(abs(left_speed))
             else:
+                print("左电机后退")
                 GPIO.output(IN1, GPIO.LOW)
                 GPIO.output(IN2, GPIO.HIGH)
                 GPIO.output(IN3, GPIO.LOW)
@@ -669,6 +664,7 @@ class CarServer:
             
             # 右电机
             if right_speed >= 0:
+                print("右电机前进")
                 GPIO.output(IN1, GPIO.HIGH)
                 GPIO.output(IN2, GPIO.LOW)
                 GPIO.output(IN3, GPIO.HIGH)
@@ -676,6 +672,7 @@ class CarServer:
                 self.pwm_a.ChangeDutyCycle(abs(right_speed))
                 self.pwm_b.ChangeDutyCycle(abs(right_speed))
             else:
+                print("右电机后退")
                 GPIO.output(IN1, GPIO.LOW)
                 GPIO.output(IN2, GPIO.HIGH)
                 GPIO.output(IN3, GPIO.LOW)
@@ -683,29 +680,66 @@ class CarServer:
                 self.pwm_a.ChangeDutyCycle(abs(right_speed))
                 self.pwm_b.ChangeDutyCycle(abs(right_speed))
             
+            print("电机速度设置完成")
+            
         except Exception as e:
             print(f"设置电机速度失败: {e}")
             self.stop()
 
     def move_forward(self, speed):
         """前进"""
-        self.set_motor_speed(speed, speed)
+        try:
+            print(f"设置前进速度：{speed}")
+            self.set_motor_speed(speed, speed)
+        except Exception as e:
+            print(f"前进命令执行失败: {e}")
 
     def move_backward(self, speed):
         """后退"""
-        self.set_motor_speed(-speed, -speed)
+        try:
+            print(f"设置后退速度：{speed}")
+            self.set_motor_speed(-speed, -speed)
+        except Exception as e:
+            print(f"后退命令执行失败: {e}")
 
     def turn_left(self, speed):
         """左转"""
-        right_speed = speed
-        left_speed = speed * 0.1  # 左轮速度降为10%
-        self.set_motor_speed(left_speed, right_speed)
+        try:
+            right_speed = speed
+            left_speed = speed * 0.1  # 左轮速度降为10%
+            print(f"左转: 左轮速度={left_speed}, 右轮速度={right_speed}")
+            self.set_motor_speed(left_speed, right_speed)
+        except Exception as e:
+            print(f"左转命令执行失败: {e}")
 
     def turn_right(self, speed):
         """右转"""
-        left_speed = speed
-        right_speed = speed * 0.1  # 右轮速度降为10%
-        self.set_motor_speed(left_speed, right_speed)
+        try:
+            left_speed = speed
+            right_speed = speed * 0.1  # 右轮速度降为10%
+            print(f"右转: 左轮速度={left_speed}, 右轮速度={right_speed}")
+            self.set_motor_speed(left_speed, right_speed)
+        except Exception as e:
+            print(f"右转命令执行失败: {e}")
+
+    def stop_motors(self):
+        """停止电机"""
+        try:
+            print("执行电机停止")
+            # 设置所有控制引脚为低电平
+            GPIO.output(IN1, GPIO.LOW)
+            GPIO.output(IN2, GPIO.LOW)
+            GPIO.output(IN3, GPIO.LOW)
+            GPIO.output(IN4, GPIO.LOW)
+            
+            # 设置PWM占空比为0
+            self.pwm_a.ChangeDutyCycle(0)
+            self.pwm_b.ChangeDutyCycle(0)
+            
+            print("电机已停止")
+            
+        except Exception as e:
+            print(f"停止电机失败: {e}")
 
 def main():
     server = CarServer()
