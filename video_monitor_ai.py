@@ -13,10 +13,15 @@ import struct
 import pickle
 from ultralytics import YOLO
 import torch
+from PyQt5.QtCore import QThread, pyqtSignal, Qt
+from PyQt5.QtGui import QImage, QPixmap
 
-class VideoMonitorAI:
+class VideoMonitorAI(QThread):
+    frame_ready = pyqtSignal(QPixmap)
+    detection_ready = pyqtSignal(list)
+    
     def __init__(self, root, host="192.168.1.100", port=5001):
-        # 使用传入的root窗口
+        super().__init__()
         self.root = root
         self.host = host
         self.port = port
@@ -37,15 +42,22 @@ class VideoMonitorAI:
         self.frame_interval = 1/30
         self.last_frame_time = 0
         self.frame_count = 0
+        self.fps = 0
         self.fps_update_interval = 1.0
         self.last_fps_update = time.time()
         self.video_socket = None
         self.video_thread = None
         
         # 初始化YOLO模型
-        self.model = YOLO('yolov8n.pt')  # 使用轻量级模型
-        self.tracking_history = {}  # 用于存储跟踪历史
-        self.max_history = 30  # 最大历史记录数
+        try:
+            self.model = YOLO('yolov8n.pt')
+            self.tracking_history = {}  # 用于存储跟踪历史
+            self.max_history = 30  # 最大历史记录数
+            self.class_names = self.model.model.names
+        except Exception as e:
+            print(f"YOLO模型初始化失败: {e}")
+            self.model = None
+            self.class_names = {}
         
         # 创建界面元素
         self.create_widgets()
@@ -115,78 +127,115 @@ class VideoMonitorAI:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.log_text.config(yscrollcommand=scrollbar.set)
 
+    def start_monitor(self, camera_index=0):
+        try:
+            self.camera = cv2.VideoCapture(camera_index)
+            if not self.camera.isOpened():
+                print(f"无法打开摄像头 {camera_index}")
+                return False
+            
+            self.camera_running = True
+            self.start()
+            return True
+        except Exception as e:
+            print(f"启动摄像头失败: {e}")
+            return False
+    
+    def stop_monitor(self):
+        self.camera_running = False
+        if self.camera is not None:
+            try:
+                self.camera.release()
+            except:
+                pass
+        self.wait()
+    
+    def run(self):
+        self.last_frame_time = time.time()
+        self.last_fps_update = self.last_frame_time
+        
+        while self.camera_running:
+            try:
+                ret, frame = self.camera.read()
+                if not ret:
+                    print("无法读取视频帧")
+                    break
+                    
+                # 处理帧
+                processed_frame, detections = self.process_frame(frame)
+                
+                # 更新FPS
+                self.update_fps()
+                
+                # 转换为Qt图像
+                height, width = processed_frame.shape[:2]
+                bytes_per_line = 3 * width
+                q_image = QImage(processed_frame.data, width, height, bytes_per_line, QImage.Format_RGB888)
+                pixmap = QPixmap.fromImage(q_image)
+                
+                # 发送信号
+                self.frame_ready.emit(pixmap)
+                self.detection_ready.emit(detections)
+                
+                # 控制帧率
+                time.sleep(0.01)  # 10ms延迟，确保帧率不会太高
+            except Exception as e:
+                print(f"处理视频帧时出错: {e}")
+                time.sleep(0.1)  # 出错时稍作等待
+    
     def process_frame(self, frame):
         """处理视频帧，添加目标检测和跟踪"""
-        if not self.processing_frame:
-            self.processing_frame = True
-            try:
-                # 运行YOLO检测
+        detections = []
+        try:
+            if not isinstance(frame, np.ndarray):
+                frame = np.array(frame)
+            
+            # 运行YOLO检测
+            if self.model is not None:
                 results = self.model(frame, verbose=False)
                 
-                # 获取检测结果
-                if len(results) > 0:
-                    result = results[0]
-                    if hasattr(result, 'boxes') and len(result.boxes) > 0:
-                        boxes = result.boxes.xyxy.cpu().numpy()
-                        confs = result.boxes.conf.cpu().numpy()
-                        cls = result.boxes.cls.cpu().numpy()
+                for result in results:
+                    # 获取检测框
+                    boxes = result.boxes.xyxy.cpu().numpy()
+                    confs = result.boxes.conf.cpu().numpy()
+                    cls = result.boxes.cls.cpu().numpy()
+                    
+                    # 处理每个检测结果
+                    for box, conf, cl in zip(boxes, confs, cls):
+                        x1, y1, x2, y2 = box.astype(int)
+                        class_id = int(cl)
+                        class_name = self.class_names.get(class_id, f"class_{class_id}")
+                        confidence = float(conf)
                         
-                        # 为每个检测到的对象分配ID
-                        for i, (box, conf, cl) in enumerate(zip(boxes, confs, cls)):
-                            try:
-                                # 确保box是有效的坐标
-                                if not np.all(np.isfinite(box)):
-                                    continue
-                                    
-                                x1, y1, x2, y2 = box.astype(int)
-                                center = ((x1 + x2) // 2, (y1 + y2) // 2)
-                                
-                                # 使用索引作为临时ID
-                                obj_id = i
-                                
-                                if obj_id not in self.tracking_history:
-                                    self.tracking_history[obj_id] = []
-                                self.tracking_history[obj_id].append(center)
-                                
-                                # 保持历史记录在限制范围内
-                                if len(self.tracking_history[obj_id]) > self.max_history:
-                                    self.tracking_history[obj_id].pop(0)
-                                
-                                # 绘制边界框和ID
-                                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                                cv2.putText(frame, f'ID:{obj_id}', (x1, y1 - 10),
-                                          cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                                
-                                # 绘制跟踪轨迹
-                                if len(self.tracking_history[obj_id]) > 1:
-                                    points = np.array(self.tracking_history[obj_id], np.int32)
-                                    cv2.polylines(frame, [points], False, (0, 255, 255), 2)
-                            except Exception as e:
-                                self.logger.error(f"处理单个检测框时出错: {e}")
-                                continue
-                
-                # 更新FPS计数
-                self.frame_count += 1
-                current_time = time.time()
-                if current_time - self.last_fps_update >= self.fps_update_interval:
-                    fps = self.frame_count / (current_time - self.last_fps_update)
-                    self.fps_label.config(text=f"FPS: {fps:.1f}")
-                    self.frame_count = 0
-                    self.last_fps_update = current_time
-                
-                # 转换图像格式并显示
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                image = Image.fromarray(frame_rgb)
-                photo = ImageTk.PhotoImage(image=image)
-                self.video_label.configure(image=photo)
-                self.video_label.image = photo
-                
-            except Exception as e:
-                self.logger.error(f"处理帧时出错: {e}")
-            finally:
-                self.processing_frame = False
+                        # 添加到检测结果列表
+                        detections.append({
+                            'class': class_name,
+                            'confidence': confidence,
+                            'bbox': [x1, y1, x2, y2]
+                        })
+                        
+                        # 绘制边界框
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                        
+                        # 显示标签
+                        label = f"{class_name} {confidence:.2f}"
+                        cv2.putText(frame, label, (x1, y1 - 10),
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            
+            # 显示FPS
+            cv2.putText(frame, f"FPS: {self.fps:.1f}", (10, 30),
+                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            
+            # 转换颜色空间
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
+        except Exception as e:
+            print(f"处理帧时出错: {e}")
+            # 如果出错，返回原始帧
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        
+        return frame, detections
 
-    # 保留原有的其他方法...
     def connect_to_video_stream(self):
         """连接到视频流"""
         try:
@@ -206,7 +255,7 @@ class VideoMonitorAI:
             
         except Exception as e:
             self.logger.error(f"连接视频流失败: {e}")
-            self.stop_camera()
+            self.stop_monitor()
 
     def receive_video(self):
         """接收视频流"""
@@ -262,62 +311,16 @@ class VideoMonitorAI:
 
     def cleanup(self):
         """清理资源"""
-        self.stop_camera()
+        self.stop_monitor()
         if hasattr(self, 'root'):
             self.root.destroy()
 
     def toggle_camera(self):
         """切换摄像头状态"""
         if not self.camera_running:
-            self.start_camera()
+            self.start_monitor()
         else:
-            self.stop_camera()
-
-    def start_camera(self):
-        """启动摄像头"""
-        if not self.camera_running:
-            try:
-                self.camera_running = True
-                self.camera_button.configure(text="关闭摄像头")
-                self.logger.info("正在连接视频流...")
-                self.connect_to_video_stream()
-            except Exception as e:
-                self.logger.error(f"启动摄像头失败: {e}")
-                self.stop_camera()
-
-    def stop_camera(self):
-        """停止摄像头"""
-        if self.camera_running:
-            self.camera_running = False
-            
-            # 关闭视频socket
-            if hasattr(self, 'video_socket') and self.video_socket:
-                try:
-                    self.video_socket.close()
-                except:
-                    pass
-                self.video_socket = None
-            
-            # 等待视频线程结束
-            if hasattr(self, 'video_thread') and self.video_thread and self.video_thread.is_alive():
-                self.video_thread.join(timeout=1.0)
-            
-            # 清理资源
-            self.cleanup_video()
-            self.camera_button.configure(text="开启摄像头")
-            self.logger.info("已断开视频流连接")
-
-    def cleanup_video(self):
-        """清理视频相关资源"""
-        # 清空帧队列
-        while not self.frame_queue.empty():
-            try:
-                self.frame_queue.get_nowait()
-            except:
-                pass
-        
-        # 清理显示
-        self.video_label.configure(image='')
+            self.stop_monitor()
 
     def take_snapshot(self):
         """截图功能"""
@@ -359,6 +362,20 @@ class VideoMonitorAI:
         
         # 添加处理器
         self.logger.addHandler(text_handler)
+
+    def update_fps(self):
+        """更新FPS计数"""
+        self.frame_count += 1
+        current_time = time.time()
+        elapsed = current_time - self.last_fps_update
+        
+        if elapsed >= self.fps_update_interval:
+            self.fps = self.frame_count / elapsed
+            self.frame_count = 0
+            self.last_fps_update = current_time
+            # 更新FPS显示
+            if hasattr(self, 'fps_label'):
+                self.fps_label.config(text=f"FPS: {self.fps:.1f}")
 
 class TextHandler(logging.Handler):
     def __init__(self, text_widget):
