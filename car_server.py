@@ -270,8 +270,6 @@ class CarServer:
         # 启动PWM
         self.pwm_a.start(0)
         self.pwm_b.start(0)
-        self.pwm_h.start(0)
-        self.pwm_v.start(0)
 
         # 设置舵机引脚
         GPIO.setup(self.PIN_SERVO_HORIZONTAL, GPIO.OUT)
@@ -469,7 +467,7 @@ class CarServer:
         global current_h_angle
         current_h_angle = max(0, min(180, angle))
         duty_cycle = self.angle_to_duty_cycle(current_h_angle)
-        self.pwm_h.ChangeDutyCycle(duty_cycle)
+        self.servo_h.ChangeDutyCycle(duty_cycle)
         return f"水平角度已设置为: {current_h_angle}度"
 
     def set_servo_v(self, angle):
@@ -477,7 +475,7 @@ class CarServer:
         global current_v_angle
         current_v_angle = max(0, min(180, angle))
         duty_cycle = self.angle_to_duty_cycle(current_v_angle)
-        self.pwm_v.ChangeDutyCycle(duty_cycle)
+        self.servo_v.ChangeDutyCycle(duty_cycle)
         return f"垂直角度已设置为: {current_v_angle}度"
 
     def forward(self):
