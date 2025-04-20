@@ -43,7 +43,7 @@ class CarServer:
         self.PIN_SERVO_HORIZONTAL = SERVO_H  # 水平舵机
         self.PIN_SERVO_VERTICAL = SERVO_V    # 垂直舵机
         self.servo_h_angle = 90         # 水平舵机初始角度
-        self.servo_v_angle = 90         # 垂直舵机初始角度
+        self.servo_v_angle = 0         # 垂直舵机初始角度
 
         # 服务器配置
         self.control_port = control_port
