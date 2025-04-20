@@ -516,8 +516,7 @@ class CarServer:
             GPIO.output(IN3, GPIO.LOW)
             GPIO.output(IN4, GPIO.LOW)
             # 左轮速度降低到30%，右轮保持原速
-            turn_speed = int(current_speed * 0.1)  # 降低到30%以获得更明显的转向效果
-            self.pwm_b.ChangeDutyCycle(turn_speed)  # 左轮
+            self.pwm_b.ChangeDutyCycle(current_speed)  # 左轮
             self.pwm_a.ChangeDutyCycle(current_speed)  # 右轮
         else:
             self.stop()
