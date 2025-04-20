@@ -606,17 +606,17 @@ class CarServer:
                     
                     # 其他命令处理
                     elif cmd == 'forward':
-                        print(f"执行前进命令，速度：{speed}")
-                        self.move_forward(speed)
+                        print(f"执行前进命令，速度：{current_speed}")
+                        self.forward()
                     elif cmd == 'backward':
-                        print(f"执行后退命令，速度：{speed}")
-                        self.move_backward(speed)
+                        print(f"执行后退命令，速度：{current_speed}")
+                        self.backward()
                     elif cmd == 'left':
-                        print(f"执行左转命令，速度：{speed}")
-                        self.turn_left(speed)
+                        print(f"执行左转命令，速度：{current_speed}")
+                        self.turn_left()
                     elif cmd == 'right':
-                        print(f"执行右转命令，速度：{speed}")
-                        self.turn_right(speed)
+                        print(f"执行右转命令，速度：{current_speed}")
+                        self.turn_right()
                     elif cmd == 'stop':
                         print("执行停止命令")
                         self.stop_motors()
@@ -708,42 +708,6 @@ class CarServer:
         except Exception as e:
             print(f"设置电机速度失败: {e}")
             self.stop()
-
-    def move_forward(self, speed):
-        """前进"""
-        try:
-            print(f"设置前进速度：{speed}")
-            self.set_motor_speed(speed, speed)
-        except Exception as e:
-            print(f"前进命令执行失败: {e}")
-
-    def move_backward(self, speed):
-        """后退"""
-        try:
-            print(f"设置后退速度：{speed}")
-            self.set_motor_speed(-speed, -speed)
-        except Exception as e:
-            print(f"后退命令执行失败: {e}")
-
-    def turn_left(self, speed):
-        """左转"""
-        try:
-            right_speed = speed
-            left_speed = speed * 0.1  # 左轮速度降为10%
-            print(f"左转: 左轮速度={left_speed}, 右轮速度={right_speed}")
-            self.set_motor_speed(left_speed, right_speed)
-        except Exception as e:
-            print(f"左转命令执行失败: {e}")
-
-    def turn_right(self, speed):
-        """右转"""
-        try:
-            left_speed = speed
-            right_speed = speed * 0.1  # 右轮速度降为10%
-            print(f"右转: 左轮速度={left_speed}, 右轮速度={right_speed}")
-            self.set_motor_speed(left_speed, right_speed)
-        except Exception as e:
-            print(f"右转命令执行失败: {e}")
 
     def stop_motors(self):
         """停止电机"""
