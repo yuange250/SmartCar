@@ -1,2 +1,7 @@
 RPi.GPIO==0.7.1
-keyboard==0.13.5 
+keyboard==0.13.5
+opencv-python>=4.5.0
+Pillow>=8.0.0
+ultralytics>=8.0.0
+torch>=1.7.0
+numpy>=1.19.0 
