@@ -90,7 +90,7 @@ class CarControlGUI:
         ttk.Label(v_frame, text="垂直角度:").pack(side=tk.LEFT)
         self.v_scale = ttk.Scale(v_frame, from_=0, to=180, orient=tk.HORIZONTAL,
                                 command=lambda v: self.on_servo_change('v', v))
-        self.v_scale.set(90)
+        self.v_scale.set(0)
         self.v_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
         # 添加复位按钮
