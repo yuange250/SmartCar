@@ -88,9 +88,9 @@ class CarControlGUI:
         v_frame.pack(fill=tk.X, padx=5, pady=5)
         
         ttk.Label(v_frame, text="垂直角度:").pack(side=tk.LEFT)
-        self.v_scale = ttk.Scale(v_frame, from_=0, to=180, orient=tk.HORIZONTAL,
+        self.v_scale = ttk.Scale(v_frame, from_=1, to=90, orient=tk.HORIZONTAL,
                                 command=lambda v: self.on_servo_change('v', v))
-        self.v_scale.set(0)
+        self.v_scale.set(1)
         self.v_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
         # 添加复位按钮
@@ -436,9 +436,9 @@ class CarControlGUI:
         try:
             # 设置水平和垂直舵机到90度
             self.h_scale.set(90)
-            self.v_scale.set(90)
+            self.v_scale.set(0)
             self.send_servo_command('h', 90)
-            self.send_servo_command('v', 90)
+            self.send_servo_command('v', 1)
             self.logger.info("摄像头已复位")
         except Exception as e:
             self.logger.error(f"复位摄像头失败: {e}")
