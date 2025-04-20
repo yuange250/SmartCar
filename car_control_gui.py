@@ -265,33 +265,41 @@ class CarControlGUI:
         """相机向上转"""
         if self.vertical_angle + self.angle_step <= 90:  # 限制最大角度
             self.vertical_angle += self.angle_step
-            self.send_command(f'set_vertical_servo {self.vertical_angle}')
+            self.on_servo_change('v', self.vertical_angle)
             self.update_servo_labels()
             self.logger.info(f"相机向上调整: {self.vertical_angle}度")
+        else:
+            self.vertical_angle = 90
 
     def camera_down(self):
         """相机向下转"""
-        if self.vertical_angle - self.angle_step >= -90:  # 限制最小角度
+        if self.vertical_angle - self.angle_step >= 0:  # 限制最小角度
             self.vertical_angle -= self.angle_step
-            self.send_command(f'set_vertical_servo {self.vertical_angle}')
+            self.on_servo_change('v', self.vertical_angle)
             self.update_servo_labels()
             self.logger.info(f"相机向下调整: {self.vertical_angle}度")
+        else:
+            self.vertical_angle = 0
 
     def camera_left(self):
         """相机向左转"""
         if self.horizontal_angle + self.angle_step <= 180:  # 限制最大角度
             self.horizontal_angle += self.angle_step
-            self.send_command(f'set_horizontal_servo {self.horizontal_angle}')
+            self.on_servo_change('h', self.horizontal_angle)
             self.update_servo_labels()
             self.logger.info(f"相机向左调整: {self.horizontal_angle}度")
+        else:
+            self.horizontal_angle = 180
 
     def camera_right(self):
         """相机向右转"""
         if self.horizontal_angle - self.angle_step >= 0:  # 限制最小角度
             self.horizontal_angle -= self.angle_step
-            self.send_command(f'set_horizontal_servo {self.horizontal_angle}')
+            self.on_servo_change('h', self.horizontal_angle)
             self.update_servo_labels()
             self.logger.info(f"相机向右调整: {self.horizontal_angle}度")
+        else:
+            self.horizontal_angle = 0
 
     def update_servo_labels(self):
         """更新舵机角度显示"""
