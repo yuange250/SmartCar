@@ -595,7 +595,7 @@ class CarServer:
                     
                     # 提取命令和参数
                     cmd = command.get('command', '')
-                    speed = command.get('speed', 50)
+                    speed = command.get('speed', current_speed)
                     self.set_speed(speed)
                     
                     # 舵机控制命令
