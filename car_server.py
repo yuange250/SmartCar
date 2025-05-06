@@ -527,7 +527,6 @@ class CarServer:
             GPIO.output(IN2, GPIO.LOW)
             GPIO.output(IN3, GPIO.HIGH)
             GPIO.output(IN4, GPIO.LOW)
-            # 右轮速度降低到30%，左轮保持原速
             self.pwm_b.ChangeDutyCycle(current_speed)  # 左轮
             self.pwm_a.ChangeDutyCycle(current_speed)  # 右轮
         else:
@@ -657,58 +656,6 @@ class CarServer:
             except Exception as e:
                 if self.running:
                     print(f"接受控制连接时出错: {e}")
-
-    def set_motor_speed(self, left_speed, right_speed):
-        """设置电机速度
-        
-        Args:
-            left_speed: 左电机速度 (-100 到 100)
-            right_speed: 右电机速度 (-100 到 100)
-        """
-        try:
-            print(f"设置电机速度: 左轮={left_speed}, 右轮={right_speed}")
-            
-            # 左电机
-            if left_speed >= 0:
-                print("左电机前进")
-                GPIO.output(IN1, GPIO.HIGH)
-                GPIO.output(IN2, GPIO.LOW)
-                GPIO.output(IN3, GPIO.HIGH)
-                GPIO.output(IN4, GPIO.LOW)
-                self.pwm_a.ChangeDutyCycle(abs(left_speed))
-                self.pwm_b.ChangeDutyCycle(abs(left_speed))
-            else:
-                print("左电机后退")
-                GPIO.output(IN1, GPIO.LOW)
-                GPIO.output(IN2, GPIO.HIGH)
-                GPIO.output(IN3, GPIO.LOW)
-                GPIO.output(IN4, GPIO.HIGH)
-                self.pwm_a.ChangeDutyCycle(abs(left_speed))
-                self.pwm_b.ChangeDutyCycle(abs(left_speed))
-            
-            # 右电机
-            if right_speed >= 0:
-                print("右电机前进")
-                GPIO.output(IN1, GPIO.HIGH)
-                GPIO.output(IN2, GPIO.LOW)
-                GPIO.output(IN3, GPIO.HIGH)
-                GPIO.output(IN4, GPIO.LOW)
-                self.pwm_a.ChangeDutyCycle(abs(right_speed))
-                self.pwm_b.ChangeDutyCycle(abs(right_speed))
-            else:
-                print("右电机后退")
-                GPIO.output(IN1, GPIO.LOW)
-                GPIO.output(IN2, GPIO.HIGH)
-                GPIO.output(IN3, GPIO.LOW)
-                GPIO.output(IN4, GPIO.HIGH)
-                self.pwm_a.ChangeDutyCycle(abs(right_speed))
-                self.pwm_b.ChangeDutyCycle(abs(right_speed))
-            
-            print("电机速度设置完成")
-            
-        except Exception as e:
-            print(f"设置电机速度失败: {e}")
-            self.stop()
 
     def stop_motors(self):
         """停止电机"""
