@@ -525,7 +525,7 @@ class CarServer:
         if current_speed > 0:
             GPIO.output(IN1, GPIO.LOW)
             GPIO.output(IN2, GPIO.LOW)
-            GPIO.output(IN3, GPIO.HIGH)w
+            GPIO.output(IN3, GPIO.HIGH)
             GPIO.output(IN4, GPIO.LOW)
             self.pwm_b.ChangeDutyCycle(current_speed)  # 左轮
             self.pwm_a.ChangeDutyCycle(current_speed)  # 右轮
