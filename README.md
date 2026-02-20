@@ -10,6 +10,11 @@
 - 两个舵机（可选，用于云台控制）
 - USB摄像头（可选，用于视频传输）
 
+### 机械臂（可选）
+
+- SO101 机械臂
+- 微雪 SO-ARM100/101 控制板（通过 USB 连接到树莓派）
+
 ## 引脚定义
 
 ### 电机控制引脚
@@ -67,6 +72,86 @@ python car_server.py
 ```bash
 python car_client.py <服务器IP>
 ```
+
+## SO101 机械臂使用说明（微雪控制板 + USB）
+
+本项目提供了一个简单的机械臂控制模块 `arm.py`，以及测试脚本 `test_arm.py`，用于通过树莓派控制 SO101 机械臂。
+
+### 1. 硬件连接
+
+- 将 SO101 机械臂接入微雪 SO-ARM100/101 控制板
+- 使用 USB 线将控制板连接到树莓派
+- 为控制板和舵机提供稳定电源（参考官方说明）
+
+### 2. 串口确认与权限
+
+在树莓派上执行：
+
+```bash
+ls /dev/ttyACM*
+sudo chmod 666 /dev/ttyACM*
+```
+
+记住实际的串口号（如 `/dev/ttyACM0` 或 `/dev/ttyACM1`），后续会用到。
+
+### 3. 安装机械臂依赖
+
+`arm.py` 使用 `pyserial` 进行串口通讯，如未安装，请执行：
+
+```bash
+pip install pyserial
+```
+
+### 4. 使用测试脚本验证机械臂
+
+在项目根目录下运行：
+
+```bash
+python3 test_arm.py
+```
+
+脚本步骤：
+
+1. 启动后，会提示你输入串口设备路径：
+   - 直接回车使用默认值 `/dev/ttyAC0`
+   - 或手动输入实际串口，例如 `/dev/ttyACM1`
+2. 连接成功后会显示菜单：
+   - `1`：回到初始姿态（调用 `ArmController.go_home`）
+   - `2`：让关节 2 上下摆动一次
+   - `3`：打开夹爪
+   - `4`：闭合夹爪
+   - `5`：自定义单关节角度（输入关节 ID、目标角度、运动时间）
+   - `0`：退出程序
+
+如果机械臂无动作，请检查：
+
+- 控制板电源是否正常
+- 舵机 ID 配置与 `arm.py` 中的假设是否一致
+- 串口号和波特率是否与控制板文档匹配
+- 总线舵机协议是否与 `arm.py` 中的打包方式一致（如不一致，仅需替换 `_build_servo_move_packet` 和 `_build_multi_servo_move_packet` 的实现）
+
+### 5. 在代码中集成机械臂控制（示意）
+
+当测试脚本工作正常后，你可以在树莓派服务端中集成机械臂，例如在 `car_server.py` 中：
+
+- 导入并初始化：
+
+```python
+from arm import ArmController
+
+# 在 CarServer.__init__ 中
+self.arm = ArmController(port="/dev/ttyACM0", baud=115200)
+```
+
+- 在网络命令处理中增加机械臂相关命令（例如 `arm_home`、`arm_open`、`arm_close` 等），并调用：
+
+```python
+self.arm.go_home()
+self.arm.open_gripper()
+self.arm.close_gripper()
+```
+
+根据你的实际协议和动作需求，可以扩展更多姿态和轨迹控制。
 
 ## 控制说明
 

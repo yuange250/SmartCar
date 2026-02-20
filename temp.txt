@@ -1,0 +1,270 @@
+FileNotFoundError: True does not exist
+
+2025-04-20 22:03:20,276 - ERROR - 处理帧时出错: True does not exist
+2025-04-20 22:03:20,277 - ERROR - Traceback (most recent call last):
+  File "C:\codes\SmartCar\video_monitor_ai.py", line 130, in process_frame
+    results = self.model(frame.any())
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 58, in __call__
+    return self.predict(source, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\torch\autograd\grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 130, in predict
+    predictor.setup(model=self.model, source=source)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\predictor.py", line 136, in setup
+    self.dataset = LoadImages(source, imgsz=imgsz, stride=stride, auto=pt, vid_stride=self.args.vid_stride)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\data\dataloaders\stream_loaders.py", line 171, in __init__
+    raise FileNotFoundError(f'{p} does not exist')
+FileNotFoundError: True does not exist
+
+2025-04-20 22:03:20,391 - ERROR - 处理帧时出错: True does not exist
+2025-04-20 22:03:20,391 - ERROR - Traceback (most recent call last):
+  File "C:\codes\SmartCar\video_monitor_ai.py", line 130, in process_frame
+    results = self.model(frame.any())
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 58, in __call__
+    return self.predict(source, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\torch\autograd\grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 130, in predict
+    predictor.setup(model=self.model, source=source)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\predictor.py", line 136, in setup
+    self.dataset = LoadImages(source, imgsz=imgsz, stride=stride, auto=pt, vid_stride=self.args.vid_stride)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\data\dataloaders\stream_loaders.py", line 171, in __init__
+    raise FileNotFoundError(f'{p} does not exist')
+FileNotFoundError: True does not exist
+
+2025-04-20 22:03:20,437 - ERROR - 处理帧时出错: True does not exist
+2025-04-20 22:03:20,437 - ERROR - Traceback (most recent call last):
+  File "C:\codes\SmartCar\video_monitor_ai.py", line 130, in process_frame
+    results = self.model(frame.any())
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 58, in __call__
+    return self.predict(source, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\torch\autograd\grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 130, in predict
+    predictor.setup(model=self.model, source=source)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\predictor.py", line 136, in setup
+    self.dataset = LoadImages(source, imgsz=imgsz, stride=stride, auto=pt, vid_stride=self.args.vid_stride)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\data\dataloaders\stream_loaders.py", line 171, in __init__
+    raise FileNotFoundError(f'{p} does not exist')
+FileNotFoundError: True does not exist
+
+2025-04-20 22:03:20,494 - ERROR - 处理帧时出错: True does not exist
+2025-04-20 22:03:20,495 - ERROR - Traceback (most recent call last):
+  File "C:\codes\SmartCar\video_monitor_ai.py", line 130, in process_frame
+    results = self.model(frame.any())
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 58, in __call__
+    return self.predict(source, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\torch\autograd\grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 130, in predict
+    predictor.setup(model=self.model, source=source)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\predictor.py", line 136, in setup
+    self.dataset = LoadImages(source, imgsz=imgsz, stride=stride, auto=pt, vid_stride=self.args.vid_stride)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\data\dataloaders\stream_loaders.py", line 171, in __init__
+    raise FileNotFoundError(f'{p} does not exist')
+FileNotFoundError: True does not exist
+
+2025-04-20 22:03:20,570 - ERROR - 处理帧时出错: True does not exist
+2025-04-20 22:03:20,570 - ERROR - Traceback (most recent call last):
+  File "C:\codes\SmartCar\video_monitor_ai.py", line 130, in process_frame
+    results = self.model(frame.any())
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 58, in __call__
+    return self.predict(source, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\torch\autograd\grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 130, in predict
+    predictor.setup(model=self.model, source=source)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\predictor.py", line 136, in setup
+    self.dataset = LoadImages(source, imgsz=imgsz, stride=stride, auto=pt, vid_stride=self.args.vid_stride)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\data\dataloaders\stream_loaders.py", line 171, in __init__
+    raise FileNotFoundError(f'{p} does not exist')
+FileNotFoundError: True does not exist
+
+2025-04-20 22:03:20,648 - ERROR - 处理帧时出错: True does not exist
+2025-04-20 22:03:20,648 - ERROR - Traceback (most recent call last):
+  File "C:\codes\SmartCar\video_monitor_ai.py", line 130, in process_frame
+    results = self.model(frame.any())
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 58, in __call__
+    return self.predict(source, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\torch\autograd\grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 130, in predict
+    predictor.setup(model=self.model, source=source)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\predictor.py", line 136, in setup
+    self.dataset = LoadImages(source, imgsz=imgsz, stride=stride, auto=pt, vid_stride=self.args.vid_stride)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\data\dataloaders\stream_loaders.py", line 171, in __init__
+    raise FileNotFoundError(f'{p} does not exist')
+FileNotFoundError: True does not exist
+
+2025-04-20 22:03:20,720 - ERROR - 处理帧时出错: True does not exist
+2025-04-20 22:03:20,720 - ERROR - Traceback (most recent call last):
+  File "C:\codes\SmartCar\video_monitor_ai.py", line 130, in process_frame
+    results = self.model(frame.any())
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 58, in __call__
+    return self.predict(source, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\torch\autograd\grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 130, in predict
+    predictor.setup(model=self.model, source=source)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\predictor.py", line 136, in setup
+    self.dataset = LoadImages(source, imgsz=imgsz, stride=stride, auto=pt, vid_stride=self.args.vid_stride)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\data\dataloaders\stream_loaders.py", line 171, in __init__
+    raise FileNotFoundError(f'{p} does not exist')
+FileNotFoundError: True does not exist
+
+2025-04-20 22:03:20,809 - ERROR - 处理帧时出错: True does not exist
+2025-04-20 22:03:20,809 - ERROR - Traceback (most recent call last):
+  File "C:\codes\SmartCar\video_monitor_ai.py", line 130, in process_frame
+    results = self.model(frame.any())
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 58, in __call__
+    return self.predict(source, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\torch\autograd\grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 130, in predict
+    predictor.setup(model=self.model, source=source)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\predictor.py", line 136, in setup
+    self.dataset = LoadImages(source, imgsz=imgsz, stride=stride, auto=pt, vid_stride=self.args.vid_stride)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\data\dataloaders\stream_loaders.py", line 171, in __init__
+    raise FileNotFoundError(f'{p} does not exist')
+FileNotFoundError: True does not exist
+
+2025-04-20 22:03:20,894 - ERROR - 处理帧时出错: True does not exist
+2025-04-20 22:03:20,894 - ERROR - Traceback (most recent call last):
+  File "C:\codes\SmartCar\video_monitor_ai.py", line 130, in process_frame
+    results = self.model(frame.any())
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 58, in __call__
+    return self.predict(source, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\torch\autograd\grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 130, in predict
+    predictor.setup(model=self.model, source=source)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\predictor.py", line 136, in setup
+    self.dataset = LoadImages(source, imgsz=imgsz, stride=stride, auto=pt, vid_stride=self.args.vid_stride)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\data\dataloaders\stream_loaders.py", line 171, in __init__
+    raise FileNotFoundError(f'{p} does not exist')
+FileNotFoundError: True does not exist
+
+2025-04-20 22:03:21,006 - ERROR - 处理帧时出错: True does not exist
+2025-04-20 22:03:21,006 - ERROR - Traceback (most recent call last):
+  File "C:\codes\SmartCar\video_monitor_ai.py", line 130, in process_frame
+    results = self.model(frame.any())
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 58, in __call__
+    return self.predict(source, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\torch\autograd\grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 130, in predict
+    predictor.setup(model=self.model, source=source)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\predictor.py", line 136, in setup
+    self.dataset = LoadImages(source, imgsz=imgsz, stride=stride, auto=pt, vid_stride=self.args.vid_stride)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\data\dataloaders\stream_loaders.py", line 171, in __init__
+    raise FileNotFoundError(f'{p} does not exist')
+FileNotFoundError: True does not exist
+
+2025-04-20 22:03:21,049 - ERROR - 处理帧时出错: True does not exist
+2025-04-20 22:03:21,050 - ERROR - Traceback (most recent call last):
+  File "C:\codes\SmartCar\video_monitor_ai.py", line 130, in process_frame
+    results = self.model(frame.any())
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 58, in __call__
+    return self.predict(source, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\torch\autograd\grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 130, in predict
+    predictor.setup(model=self.model, source=source)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\predictor.py", line 136, in setup
+    self.dataset = LoadImages(source, imgsz=imgsz, stride=stride, auto=pt, vid_stride=self.args.vid_stride)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\data\dataloaders\stream_loaders.py", line 171, in __init__
+    raise FileNotFoundError(f'{p} does not exist')
+FileNotFoundError: True does not exist
+
+2025-04-20 22:03:21,116 - ERROR - 处理帧时出错: True does not exist
+2025-04-20 22:03:21,117 - ERROR - Traceback (most recent call last):
+  File "C:\codes\SmartCar\video_monitor_ai.py", line 130, in process_frame
+    results = self.model(frame.any())
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 58, in __call__
+    return self.predict(source, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\torch\autograd\grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 130, in predict
+    predictor.setup(model=self.model, source=source)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\predictor.py", line 136, in setup
+    self.dataset = LoadImages(source, imgsz=imgsz, stride=stride, auto=pt, vid_stride=self.args.vid_stride)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\data\dataloaders\stream_loaders.py", line 171, in __init__
+    raise FileNotFoundError(f'{p} does not exist')
+FileNotFoundError: True does not exist
+
+2025-04-20 22:03:21,169 - ERROR - 处理帧时出错: True does not exist
+2025-04-20 22:03:21,169 - ERROR - Traceback (most recent call last):
+  File "C:\codes\SmartCar\video_monitor_ai.py", line 130, in process_frame
+    results = self.model(frame.any())
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 58, in __call__
+    return self.predict(source, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\torch\autograd\grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 130, in predict
+    predictor.setup(model=self.model, source=source)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\predictor.py", line 136, in setup
+    self.dataset = LoadImages(source, imgsz=imgsz, stride=stride, auto=pt, vid_stride=self.args.vid_stride)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\data\dataloaders\stream_loaders.py", line 171, in __init__
+    raise FileNotFoundError(f'{p} does not exist')
+FileNotFoundError: True does not exist
+
+2025-04-20 22:03:21,229 - ERROR - 处理帧时出错: True does not exist
+2025-04-20 22:03:21,230 - ERROR - Traceback (most recent call last):
+  File "C:\codes\SmartCar\video_monitor_ai.py", line 130, in process_frame
+    results = self.model(frame.any())
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 58, in __call__
+    return self.predict(source, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\torch\autograd\grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 130, in predict
+    predictor.setup(model=self.model, source=source)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\predictor.py", line 136, in setup
+    self.dataset = LoadImages(source, imgsz=imgsz, stride=stride, auto=pt, vid_stride=self.args.vid_stride)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\data\dataloaders\stream_loaders.py", line 171, in __init__
+    raise FileNotFoundError(f'{p} does not exist')
+FileNotFoundError: True does not exist
+
+2025-04-20 22:03:21,300 - ERROR - 处理帧时出错: True does not exist
+2025-04-20 22:03:21,300 - ERROR - Traceback (most recent call last):
+  File "C:\codes\SmartCar\video_monitor_ai.py", line 130, in process_frame
+    results = self.model(frame.any())
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 58, in __call__
+    return self.predict(source, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\torch\autograd\grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 130, in predict
+    predictor.setup(model=self.model, source=source)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\predictor.py", line 136, in setup
+    self.dataset = LoadImages(source, imgsz=imgsz, stride=stride, auto=pt, vid_stride=self.args.vid_stride)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\data\dataloaders\stream_loaders.py", line 171, in __init__
+    raise FileNotFoundError(f'{p} does not exist')
+FileNotFoundError: True does not exist
+
+2025-04-20 22:03:21,376 - ERROR - 处理帧时出错: True does not exist
+2025-04-20 22:03:21,376 - ERROR - Traceback (most recent call last):
+  File "C:\codes\SmartCar\video_monitor_ai.py", line 130, in process_frame
+    results = self.model(frame.any())
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 58, in __call__
+    return self.predict(source, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\torch\autograd\grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 130, in predict
+    predictor.setup(model=self.model, source=source)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\predictor.py", line 136, in setup
+    self.dataset = LoadImages(source, imgsz=imgsz, stride=stride, auto=pt, vid_stride=self.args.vid_stride)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\data\dataloaders\stream_loaders.py", line 171, in __init__
+    raise FileNotFoundError(f'{p} does not exist')
+FileNotFoundError: True does not exist
+
+2025-04-20 22:03:21,497 - ERROR - 处理帧时出错: True does not exist
+2025-04-20 22:03:21,497 - ERROR - Traceback (most recent call last):
+  File "C:\codes\SmartCar\video_monitor_ai.py", line 130, in process_frame
+    results = self.model(frame.any())
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 58, in __call__
+    return self.predict(source, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\torch\autograd\grad_mode.py", line 27, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\model.py", line 130, in predict
+    predictor.setup(model=self.model, source=source)
+  File "C:\Users\Chen\Anaconda3\lib\site-packages\ultralytics\yolo\engine\predictor.py", line 136, in setup
+    self.dataset = LoadImages(source, imgsz=imgsz, stride=stride, auto=pt, vid_stride=self.args.vid_stride)
