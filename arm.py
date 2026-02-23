@@ -124,6 +124,7 @@ class ArmController:
             / "lerobot"
             / "calibration"
             / "robots"
+            / "so_follower"
             / f"{robot_id}.json"
         )
         if not calib_path.exists():
