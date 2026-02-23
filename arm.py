@@ -1,82 +1,146 @@
 #!/usr/bin/env python3
 """
-SO101 机械臂控制模块（通过微雪控制板 + USB 串口）
+SO101 机械臂控制模块（基于 LeRobot + FeetechMotorsBus 的薄封装）
 
-注意：
-1. 不同固件/控制板的总线舵机协议可能略有差异，请对照微雪/舵机官方文档确认帧格式。
-2. 这里按照常见总线舵机协议（0x55 0x55 头 + ID + 长度 + 指令 + 参数 + 校验）给出参考实现，
-   如果你的控制板文档使用不同协议，请只保留串口部分，替换打包指令的函数。
-3. 建议在树莓派上安装 pyserial：
-   pip install pyserial
+适用场景：
+- 机械臂：SO101（follower arm）
+- 控制板：微雪 SO-ARM100/101，通过 USB 连接到树莓派
+- 下层驱动与标定：由 LeRobot 官方完成，本模块只做“薄封装”
+
+前置条件（非常重要）：
+1. 已在当前 Python 环境中安装 LeRobot 及 Feetech 支持：
+   pip install "lerobot[feetech]"
+2. 已使用官方命令完成电机配置与标定（只需做一次）：
+   lerobot-find-port
+   lerobot-setup-motors --robot.type=so101_follower --robot.port=/dev/ttyACM0 --robot.id=my_follower_arm
+   lerobot-calibrate   --robot.type=so101_follower --robot.port=/dev/ttyACM0 --robot.id=my_follower_arm
+
+本文件在此基础上，提供：
+- ArmController：按“关节 ID / 简单动作”来控制机械臂，方便与你的小车逻辑对接。
 """
 
 from __future__ import annotations
 
-import threading
 import time
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Sequence
+from pathlib import Path
+from typing import Dict, Iterable, Optional, Sequence
 
-import serial
+import draccus
+from lerobot.motors import Motor, MotorCalibration, MotorNormMode
+from lerobot.motors.feetech import FeetechMotorsBus
 
 
 @dataclass
 class JointLimit:
-    """单个关节的角度限制（单位：度）"""
+    """单个关节的角度或开合范围限制."""
 
-    min_deg: float
-    max_deg: float
+    min_val: float
+    max_val: float
 
 
 class ArmController:
     """
-    SO101 机械臂控制类。
+    SO101 机械臂控制类（基于 LeRobot 的 FeetechMotorsBus）。
 
-    典型接线：微雪 SO-ARM100/101 控制板通过 USB 连接到树莓派，
-    在树莓派上会出现类似 /dev/ttyACM0 的串口设备。
+    约定：
+    - 关节 ID 与官方示意保持一致：
+        1: shoulder_pan   （底座）
+        2: shoulder_lift  （大臂）
+        3: elbow_flex     （小臂）
+        4: wrist_flex     （手腕俯仰）
+        5: wrist_roll     （手腕旋转）
+        6: gripper        （夹爪）
+    - 1~5 关节使用“角度（度）”控制，6 使用 [0, 100] 的开合百分比。
 
     参数:
-        port:   串口设备路径，树莓派上通常为 '/dev/ttyACM0' 或 '/dev/ttyACM1'
-        baud:   波特率，参考控制板文档，常见为 115200 或 1000000
-        timeout: 读超时时间（秒）
-        joint_limits: 关节角度限制配置，key 为关节 ID（1~N）
+        port:      USB 串口设备路径，例如 '/dev/ttyACM0'
+        robot_id:  标定时使用的 --robot.id，例如 'my_follower_arm'
+        joint_limits: 关节限制配置，key 为关节 ID（1~6）
     """
 
     def __init__(
         self,
         port: str = "/dev/ttyACM0",
-        baud: int = 115200,
-        timeout: float = 0.1,
+        robot_id: str = "my_follower_arm",
         joint_limits: Optional[Dict[int, JointLimit]] = None,
     ) -> None:
         self._port = port
-        self._baud = baud
-        self._timeout = timeout
-        self._lock = threading.Lock()
+        self._robot_id = robot_id
 
-        # 默认假设 6 自由度 + 夹爪，ID 1~6 为关节，ID 7 为夹爪
-        self.joint_limits: Dict[int, JointLimit] = joint_limits or {
-            1: JointLimit(-90, 90),   # 底座
-            2: JointLimit(-45, 90),   # 大臂
-            3: JointLimit(-90, 90),   # 小臂
-            4: JointLimit(-90, 90),   # 手腕俯仰
-            5: JointLimit(-180, 180), # 手腕旋转
-            6: JointLimit(-180, 180), # 末端
-            7: JointLimit(0, 90),     # 夹爪张合
+        # 关节 ID -> 名称 映射
+        self.id_to_name: Dict[int, str] = {
+            1: "shoulder_pan",
+            2: "shoulder_lift",
+            3: "elbow_flex",
+            4: "wrist_flex",
+            5: "wrist_roll",
+            6: "gripper",
         }
 
-        self._ser = serial.Serial(
+        # 关节限制（1~5：角度，单位度；6：夹爪开合百分比 0~100）
+        self.joint_limits: Dict[int, JointLimit] = joint_limits or {
+            1: JointLimit(-90.0, 90.0),
+            2: JointLimit(-60.0, 90.0),
+            3: JointLimit(-120.0, 120.0),
+            4: JointLimit(-120.0, 120.0),
+            5: JointLimit(-180.0, 180.0),
+            6: JointLimit(0.0, 100.0),  # 夹爪开合 0~100%
+        }
+
+        # 加载标定文件
+        calibration = self._load_calibration(robot_id)
+
+        # 创建电机总线
+        self._bus = FeetechMotorsBus(
             port=self._port,
-            baudrate=self._baud,
-            timeout=self._timeout,
+            motors={
+                "shoulder_pan": Motor(1, "sts3215", MotorNormMode.DEGREES),
+                "shoulder_lift": Motor(2, "sts3215", MotorNormMode.DEGREES),
+                "elbow_flex": Motor(3, "sts3215", MotorNormMode.DEGREES),
+                "wrist_flex": Motor(4, "sts3215", MotorNormMode.DEGREES),
+                "wrist_roll": Motor(5, "sts3215", MotorNormMode.DEGREES),
+                # 夹爪用 0~100 范围控制，具体含义取决于标定和机械结构
+                "gripper": Motor(6, "sts3215", MotorNormMode.RANGE_0_100),
+            },
+            calibration=calibration,
         )
+
+        # 连接并上扭矩
+        self._bus.connect(enable_torque=True)
+
+    @staticmethod
+    def _load_calibration(robot_id: str) -> Dict[str, MotorCalibration]:
+        """
+        从默认路径加载标定数据。
+
+        标定文件默认位于：
+        ~/.cache/huggingface/lerobot/calibration/robots/<robot_id>.json
+        """
+        calib_path = (
+            Path.home()
+            / ".cache"
+            / "huggingface"
+            / "lerobot"
+            / "calibration"
+            / "robots"
+            / f"{robot_id}.json"
+        )
+        if not calib_path.exists():
+            raise FileNotFoundError(
+                f"找不到标定文件: {calib_path}\n"
+                f"请先运行 lerobot-calibrate 完成机械臂标定。"
+            )
+
+        with calib_path.open("r", encoding="utf-8") as f, draccus.config_type("json"):
+            calibration = draccus.load(Dict[str, MotorCalibration], f)
+        return calibration
 
     # ===================== 对外高层接口 ===================== #
     def close(self) -> None:
-        """关闭串口连接。"""
-        with self._lock:
-            if self._ser and self._ser.is_open:
-                self._ser.close()
+        """断开总线连接，释放扭矩。"""
+        if self._bus:
+            self._bus.disconnect()
 
     def set_joint_angle(
         self,
@@ -88,16 +152,23 @@ class ArmController:
         设置单个关节角度。
 
         Args:
-            joint_id: 关节 ID（1~N，对应舵机 ID）
-            angle_deg: 目标角度（度），会根据 joint_limits 自动裁剪
-            duration_ms: 运动时间，毫秒
+            joint_id: 关节 ID（1~6）
+            angle_deg: 目标值：
+                - 关节 1~5：角度（度）
+                - 关节 6：夹爪开合百分比（0~100）
+            duration_ms: 运动时间，毫秒（当前版本依赖 LeRobot 默认时间常数）
         """
-        limit = self.joint_limits.get(joint_id)
-        if limit:
-            angle_deg = max(limit.min_deg, min(limit.max_deg, angle_deg))
+        if joint_id not in self.id_to_name:
+            raise ValueError(f"未知关节 ID: {joint_id}")
 
-        packet = self._build_servo_move_packet(joint_id, angle_deg, duration_ms)
-        self._send_packet(packet)
+        name = self.id_to_name[joint_id]
+        limit = self.joint_limits.get(joint_id)
+        value = angle_deg
+        if limit:
+            value = max(limit.min_val, min(limit.max_val, value))
+
+        # 这里直接设置目标位置，时间参数目前由 LeRobot 内部控制
+        self._bus.set_goal_positions({name: float(value)})
 
     def set_pose(
         self,
@@ -109,30 +180,33 @@ class ArmController:
         同步设置多个关节角度（典型用于一个动作姿态）。
 
         Args:
-            joint_ids: 关节 ID 列表
-            angles_deg: 对应的角度列表
-            duration_ms: 所有关节共同的运动时间
+            joint_ids: 关节 ID 列表（1~6）
+            angles_deg: 对应的目标值列表
+            duration_ms: 所有关节共同的运动时间（当前版本依赖 LeRobot 默认时间常数）
         """
         if len(joint_ids) != len(angles_deg):
             raise ValueError("joint_ids 和 angles_deg 长度必须一致")
 
-        clipped_angles: List[float] = []
+        goals: Dict[str, float] = {}
         for jid, ang in zip(joint_ids, angles_deg):
+            if jid not in self.id_to_name:
+                raise ValueError(f"未知关节 ID: {jid}")
+            name = self.id_to_name[jid]
             limit = self.joint_limits.get(jid)
+            value = ang
             if limit:
-                ang = max(limit.min_deg, min(limit.max_deg, ang))
-            clipped_angles.append(ang)
+                value = max(limit.min_val, min(limit.max_val, value))
+            goals[name] = float(value)
 
-        packet = self._build_multi_servo_move_packet(joint_ids, clipped_angles, duration_ms)
-        self._send_packet(packet)
+        self._bus.set_goal_positions(goals)
 
-    def open_gripper(self, angle_deg: float = 0, duration_ms: int = 400) -> None:
-        """打开夹爪，角度和限制可根据实际机械结构调整。"""
-        self.set_joint_angle(7, angle_deg, duration_ms=duration_ms)
+    def open_gripper(self, open_percent: float = 100.0) -> None:
+        """打开夹爪，参数为 0~100 的开合百分比。"""
+        self.set_joint_angle(6, open_percent)
 
-    def close_gripper(self, angle_deg: float = 60, duration_ms: int = 400) -> None:
-        """闭合夹爪。"""
-        self.set_joint_angle(7, angle_deg, duration_ms=duration_ms)
+    def close_gripper(self, close_percent: float = 0.0) -> None:
+        """闭合夹爪，参数为 0~100 的开合百分比。"""
+        self.set_joint_angle(6, close_percent)
 
     def go_home(self, duration_ms: int = 1000) -> None:
         """
@@ -143,11 +217,11 @@ class ArmController:
         - 小臂 3：0°
         - 手腕俯仰 4：0°
         - 手腕旋转 5：0°
-        - 末端 6：0°
-        - 夹爪 7：30°
+        - 末端 5：0°
+        - 夹爪 6：50%（半开）
         """
-        joint_ids = [1, 2, 3, 4, 5, 6, 7]
-        angles = [0, 0, 0, 0, 0, 0, 30]
+        joint_ids = [1, 2, 3, 4, 5, 6]
+        angles = [0.0, 0.0, 0.0, 0.0, 0.0, 50.0]
         self.set_pose(joint_ids, angles, duration_ms=duration_ms)
 
     def execute_trajectory(
@@ -172,118 +246,14 @@ class ArmController:
             self.set_pose(joint_ids, angles, duration_ms=duration_ms)
             time.sleep(pause_ms_between / 1000.0)
 
-    # ===================== 串口与协议封装 ===================== #
-    def _send_packet(self, packet: bytes) -> None:
-        """线程安全地发送一帧数据到串口。"""
-        with self._lock:
-            if not self._ser or not self._ser.is_open:
-                raise RuntimeError("串口未打开")
-            self._ser.write(packet)
-
-    @staticmethod
-    def _angle_deg_to_raw(angle_deg: float) -> int:
-        """
-        将角度转换为舵机内部位置值。
-
-        这里默认假设：
-            0~240 度 → 0~1000（仅作为示例）
-        请根据实际舵机协议和量程修改。
-        """
-        angle_deg = max(0.0, min(240.0, angle_deg))
-        return int(angle_deg / 240.0 * 1000)
-
-    @staticmethod
-    def _u16_to_bytes_le(value: int) -> bytes:
-        """16bit 小端字节序。"""
-        value = max(0, min(0xFFFF, int(value)))
-        return bytes((value & 0xFF, (value >> 8) & 0xFF))
-
-    def _build_servo_move_packet(
-        self,
-        servo_id: int,
-        angle_deg: float,
-        duration_ms: int,
-    ) -> bytes:
-        """
-        构建单舵机移动指令帧。
-
-        协议示例（常见总线舵机）：
-        0    : 0x55
-        1    : 0x55
-        2    : ID
-        3    : 长度（从指令到最后一个参数，包括校验前的所有字节数）
-        4    : 指令码（示例使用 0x03：写位置）
-        5..n : 参数（示例：位置、时间等）
-        最后 : 校验和（从 ID 到最后一个参数取反）
-        """
-        # 示例：指令 0x03，参数：位置(2B) + 时间(2B)
-        cmd = 0x03
-        pos_raw = self._angle_deg_to_raw(angle_deg)
-        pos_bytes = self._u16_to_bytes_le(pos_raw)
-        time_bytes = self._u16_to_bytes_le(duration_ms)
-
-        params = list(pos_bytes + time_bytes)
-
-        length = 1 + len(params)  # 指令 + 参数
-        frame = [0x55, 0x55, servo_id & 0xFF, length & 0xFF, cmd] + params
-
-        checksum = (~sum(frame[2:]) + 1) & 0xFF
-        frame.append(checksum)
-
-        return bytes(frame)
-
-    def _build_multi_servo_move_packet(
-        self,
-        servo_ids: Sequence[int],
-        angles_deg: Sequence[float],
-        duration_ms: int,
-    ) -> bytes:
-        """
-        构建多舵机同步移动指令帧。
-
-        常见格式示例：
-        0    : 0x55
-        1    : 0x55
-        2    : 0xFE（广播 ID）
-        3    : 长度
-        4    : 指令码（自定义为 0x08 之类的“同步写”）
-        5    : 舵机数量 N
-        6..  : [ID, 位置低8位, 位置高8位] * N
-        ...  : 共用时间（2B）
-        最后 : 校验和
-        """
-        if not servo_ids:
-            raise ValueError("servo_ids 不能为空")
-
-        cmd = 0x08  # 示例：多舵机同步移动
-
-        params: List[int] = [len(servo_ids) & 0xFF]
-
-        for sid, ang in zip(servo_ids, angles_deg):
-            pos_raw = self._angle_deg_to_raw(ang)
-            pos_bytes = self._u16_to_bytes_le(pos_raw)
-            params.append(sid & 0xFF)
-            params.extend(pos_bytes)
-
-        time_bytes = self._u16_to_bytes_le(duration_ms)
-        params.extend(time_bytes)
-
-        length = 1 + len(params)  # 指令 + 参数
-        frame = [0x55, 0x55, 0xFE, length & 0xFF, cmd] + params
-
-        checksum = (~sum(frame[2:]) + 1) & 0xFF
-        frame.append(checksum)
-
-        return bytes(frame)
-
 
 def _demo() -> None:
     """
     简单本地测试示例：
     在树莓派上直接运行本文件，先让机械臂回到初始姿态，然后轻微摆动关节 2。
-    请根据实际串口号调整 port 参数。
+    请根据实际串口号和 robot_id 调整参数。
     """
-    arm = ArmController(port="/dev/ttyACM0", baud=115200)
+    arm = ArmController(port="/dev/ttyACM0", robot_id="my_follower_arm")
     try:
         arm.go_home(duration_ms=1500)
         time.sleep(2.0)

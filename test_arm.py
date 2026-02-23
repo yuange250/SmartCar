@@ -2,19 +2,26 @@
 """
 SO101 机械臂基础测试脚本
 
-用途：
+本脚本基于 LeRobot 官方驱动做“薄封装测试”，用于：
 1. 检查树莓派能否通过 USB 串口识别微雪控制板
-2. 验证简单动作是否能正常执行（回零、摆动、夹爪）
+2. 验证 LeRobot + 标定 是否配置正确
+3. 快速测试几个基础动作（回零、关节摆动、夹爪）
+
+前置条件（必须完成，否则机械臂不会动）：
+1. 已安装 LeRobot 及 Feetech 支持：
+   pip install "lerobot[feetech]"
+2. 已完成电机配置与标定（只做一次）：
+   lerobot-find-port
+   lerobot-setup-motors --robot.type=so101_follower --robot.port=/dev/ttyACM0 --robot.id=my_follower_arm
+   lerobot-calibrate   --robot.type=so101_follower --robot.port=/dev/ttyACM0 --robot.id=my_follower_arm
 
 使用方法（在树莓派上）：
 1. 确认串口号，例如：
    ls /dev/ttyACM*
    sudo chmod 666 /dev/ttyACM*
-2. 安装依赖：
-   pip install pyserial
-3. 运行测试：
+2. 运行测试：
    python3 test_arm.py
-4. 按提示输入串口号（默认 /dev/ttyACM0），然后根据菜单选择动作
+3. 按提示输入串口号和 robot_id（默认 my_follower_arm），然后根据菜单选择动作
 """
 
 import sys
@@ -28,19 +35,26 @@ def select_port(default: str = "/dev/ttyACM0") -> str:
     print("请输入机械臂控制板对应的串口设备路径：")
     print(f"直接回车使用默认值 [{default}]")
     port = input("> ").strip()
-    if not port:
-        port = default
-    return port
+    return port or default
+
+
+def select_robot_id(default: str = "my_follower_arm") -> str:
+    """选择标定时使用的 robot_id。"""
+    print("请输入标定时使用的 robot.id （lerobot-calibrate 的 --robot.id）：")
+    print(f"直接回车使用默认值 [{default}]")
+    rid = input("> ").strip()
+    return rid or default
 
 
 def main() -> None:
     print("==== SO101 机械臂测试程序 ====")
     port = select_port()
+    robot_id = select_robot_id()
 
     try:
-        arm = ArmController(port=port, baud=115200)
+        arm = ArmController(port=port, robot_id=robot_id)
     except Exception as e:
-        print(f"打开串口失败，请检查 USB 连接和权限: {e}")
+        print(f"创建 ArmController 失败，请检查 LeRobot 安装、标定和串口配置: {e}")
         sys.exit(1)
 
     print(f"已连接串口: {port}")
@@ -48,6 +62,7 @@ def main() -> None:
     print("  - 微雪控制板电源已接好")
     print("  - 舵机 ID 与协议配置正确")
     print("  - 串口号、波特率与控制板文档一致\n")
+    print("  - 已完成 lerobot-setup-motors / lerobot-calibrate 并使用相同的 robot.id\n")
 
     try:
         while True:
@@ -76,20 +91,24 @@ def main() -> None:
 
             elif choice == "3":
                 print("执行：打开夹爪...")
-                arm.open_gripper()
+                arm.open_gripper(open_percent=100.0)
                 time.sleep(1.0)
                 print("完成")
 
             elif choice == "4":
                 print("执行：闭合夹爪...")
-                arm.close_gripper()
+                arm.close_gripper(close_percent=0.0)
                 time.sleep(1.0)
                 print("完成")
 
             elif choice == "5":
                 try:
-                    jid = int(input("请输入关节 ID (整数，例如 1~7): ").strip())
-                    ang = float(input("请输入目标角度（度，例如 0 / 30 / -30）: ").strip())
+                    jid = int(input("请输入关节 ID (1~6，6 为夹爪): ").strip())
+                    ang = float(
+                        input(
+                            "请输入目标值：1~5 关节为角度(度)，6 为开合百分比(0~100): "
+                        ).strip()
+                    )
                     dur = int(input("请输入运动时间 ms（例如 500）: ").strip() or "500")
                 except ValueError:
                     print("输入格式错误，请重试。")
