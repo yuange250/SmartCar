@@ -170,8 +170,9 @@ class ArmController:
         if limit:
             value = max(limit.min_val, min(limit.max_val, value))
 
-        # 这里直接设置目标位置，时间参数目前由 LeRobot 内部控制
-        self._bus.set_goal_positions({name: float(value)})
+        # 这里直接写入目标位置，具体时间参数由 LeRobot/舵机内部控制
+        # 使用归一化写入：1~5 关节为角度（度），6 号为开合百分比（0~100）
+        self._bus.write("Goal_Position", name, float(value), normalize=True)
 
     def set_pose(
         self,
@@ -201,7 +202,8 @@ class ArmController:
                 value = max(limit.min_val, min(limit.max_val, value))
             goals[name] = float(value)
 
-        self._bus.set_goal_positions(goals)
+        # 同步写入多个关节的目标位置
+        self._bus.sync_write("Goal_Position", goals, normalize=True)
 
     def open_gripper(self, open_percent: float = 100.0) -> None:
         """打开夹爪，参数为 0~100 的开合百分比。"""
