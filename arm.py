@@ -106,8 +106,10 @@ class ArmController:
             calibration=calibration,
         )
 
-        # 连接并上扭矩
-        self._bus.connect(enable_torque=True)
+        # 连接电机总线（部分版本会在 connect 内部自动上扭矩）
+        # 如果你的 LeRobot 版本需要手动 enable torque，可以在这里补充：
+        #   self._bus.enable_torque(...)
+        self._bus.connect()
 
     @staticmethod
     def _load_calibration(robot_id: str) -> Dict[str, MotorCalibration]:
